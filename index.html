@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Kai Breakout" />
+<meta name="theme-color" content="#0f1226" />
+<link rel="apple-touch-icon" href="KaiBreakout Logo.png" />
+<link rel="icon" type="image/png" href="kaiball.png" />
 <title>Kai Breakout</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@600;800&display=swap');
@@ -16,6 +24,16 @@
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Safe-area padding for iOS standalone (PWA) mode — keeps the canvas
+     out from under the rounded corners / status bar / home indicator. */
+  body {
+    padding-top:    env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left:   env(safe-area-inset-left);
+    padding-right:  env(safe-area-inset-right);
+    box-sizing: border-box;
   }
   /* Scale-to-fit: the wrap is positioned absolutely and scaled by a CSS variable
      that JS recomputes on resize/orientation change. The natural design size
@@ -619,12 +637,12 @@
       </div>
     </div>
   </div>
-  <div id="hint"><b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH / PAUSE</div>
+  <div id="hint"></div>
 </div>
 
 <div id="orientation-overlay">
   <div class="rotate-icon">📱</div>
-  <div class="rotate-text">PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE</div>
+  <div id="orientation-msg" class="rotate-text">PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE</div>
 </div>
 
 <div id="title-screen">
@@ -642,29 +660,84 @@
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
 
-  // ---------- Responsive: scale-to-fit + orientation prompt ----------
-  // Natural design size of the layout (sidebar + canvas + hint, with margins).
+  // ---------- Device detection ----------
+  const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const IS_STANDALONE =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.navigator.standalone === true;
+  // Populate the bottom hint text based on input device.
+  const hintEl = document.getElementById('hint');
+  if (hintEl) {
+    hintEl.innerHTML = IS_TOUCH
+      ? '<b>DRAG</b> PADDLE &nbsp;·&nbsp; <b>TAP</b> LAUNCH &nbsp;·&nbsp; <b>TAP HIGH</b> PAUSE'
+      : '<b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH / PAUSE';
+  }
+
+  // ---------- Responsive: scale-to-fit + orientation/expand prompt ----------
   const NATURAL_W = 1180;
   const NATURAL_H = 700;
   function updateGameScale() {
-    const sx = window.innerWidth  / NATURAL_W;
-    const sy = window.innerHeight / NATURAL_H;
-    // Never upscale past 1 — pixel art looks crispest at native; cap to 1× max.
+    // In standalone (PWA) mode the body has safe-area padding that shrinks the
+    // viewable area; account for it via clientWidth/Height instead of innerWidth.
+    const w = document.documentElement.clientWidth  || window.innerWidth;
+    const h = document.documentElement.clientHeight || window.innerHeight;
+    const sx = w / NATURAL_W;
+    const sy = h / NATURAL_H;
     const s = Math.min(sx, sy, 1);
     document.documentElement.style.setProperty('--game-scale', s.toFixed(4));
   }
-  const orientationEl = document.getElementById('orientation-overlay');
+  const orientationEl  = document.getElementById('orientation-overlay');
+  const orientationMsg = document.getElementById('orientation-msg');
   function checkOrientation() {
-    // Only nag on phone-sized viewports (under 900px wide) when held in portrait.
-    const isPortrait = window.innerHeight > window.innerWidth;
-    const isSmall    = Math.max(window.innerWidth, window.innerHeight) < 900 ||
-                       Math.min(window.innerWidth, window.innerHeight) < 500;
-    orientationEl.classList.toggle('show', isPortrait && isSmall);
+    const w = window.innerWidth, h = window.innerHeight;
+    const portrait = h > w;
+    // The wrap needs ~1180×700 of viewable area to look right. If either dim
+    // is way smaller than that we want to show a prompt.
+    const tooSmallEither = w < 700 || h < 500;
+    let bad = false;
+    let mode = 'rotate';  // 'rotate' for mobile, 'expand' for desktop
+    if (IS_TOUCH && portrait) {
+      bad = true; mode = 'rotate';
+    } else if (!IS_TOUCH && portrait && tooSmallEither) {
+      // Laptop window is too tall/narrow — ask user to widen the browser
+      bad = true; mode = 'expand';
+    }
+    orientationEl.classList.toggle('show', bad);
+    if (bad && orientationMsg) {
+      orientationMsg.innerHTML = (mode === 'rotate')
+        ? 'PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE'
+        : 'PLEASE WIDEN<br>YOUR BROWSER<br>WINDOW';
+    }
+    // Auto-pause the game whenever the viewport goes "bad" mid-play.
+    // Wrap in try/catch because state may be in TDZ during the very first
+    // call at IIFE init time (before `const state = {...}` is evaluated).
+    if (bad) {
+      try {
+        if (gameStarted && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
+          setPaused(true);
+        }
+      } catch (_) {}
+    }
   }
-  window.addEventListener('resize', () => { updateGameScale(); checkOrientation(); });
-  window.addEventListener('orientationchange', () => { updateGameScale(); checkOrientation(); });
+  // Recompute on resize / orientation / when returning from the iOS bar collapse.
+  window.addEventListener('resize',           () => { updateGameScale(); checkOrientation(); });
+  window.addEventListener('orientationchange',() => { updateGameScale(); checkOrientation(); });
+  window.visualViewport && window.visualViewport.addEventListener('resize',
+                                                () => { updateGameScale(); checkOrientation(); });
   updateGameScale();
   checkOrientation();
+
+  // Auto-pause the game when the tab/window goes inactive (and stop music timers
+  // through the existing pause path — they all silently no-op while paused).
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    try {
+      if (gameStarted && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
+        setPaused(true);
+      }
+    } catch (_) {}
+  });
 
   const titleScreen = document.getElementById('title-screen');
   const titleStartBtn = document.getElementById('title-start');
@@ -1389,9 +1462,9 @@
 
   function launchBall() {
     if (!state.ball.stuck) return;
-    // Speed curve for 7 levels: gentle ramp, with top speed lower than the old level-5 max.
-    // Old: L5 = 4 + 4*0.7 = 6.8.  New: L7 = 4 + 6*0.4 = 6.4.
-    const speed = 4 + (state.level - 1) * 0.4;
+    // Speed curve for 7 levels. Bumped ~20% to feel right at the 60-tick/sec
+    // fixed sim rate (some devices were running RAF faster before).
+    const speed = 4.8 + (state.level - 1) * 0.5;
     const angle = (-Math.PI/2) + (Math.random()-0.5) * 0.6; // mostly up
     state.ball.vx = Math.cos(angle) * speed;
     state.ball.vy = Math.sin(angle) * speed;
@@ -2115,41 +2188,51 @@
   });
 
   // ---------- Touch controls (mobile / iPad) ----------
-  // Finger DRAG = paddle position; TAP = launch / dismiss / restart / next-level.
-  // We distinguish drag vs tap by whether the finger moved more than 6px.
+  // Touching anywhere sets a TARGET x; the paddle slides toward it at a fixed
+  // speed per tick (no teleport). Dragging continuously updates the target so
+  // the paddle still tracks the finger.
+  //   • Tap (no movement, low Y) during gameplay = launches a stuck ball,
+  //     advances level-complete screen, or dismisses title/endgame.
+  //   • Tap (no movement, HIGH Y — top 60% of canvas) during active play = pause.
+  state.touchTargetX = null;
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
-  function touchPosToCanvasX(touch) {
+  function touchPosToCanvas(touch) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = W / rect.width;
-    return (touch.clientX - rect.left) * scaleX;
-  }
-  function applyTouchPaddle(touch) {
-    const x = touchPosToCanvasX(touch);
-    state.paddleX = Math.max(0, Math.min(W - paddleW(), x - paddleW()/2));
-    if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
+    return {
+      x: (touch.clientX - rect.left) * (W / rect.width),
+      y: (touch.clientY - rect.top)  * (H / rect.height),
+    };
   }
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     const t = e.touches[0];
     if (!t) return;
     touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
-    applyTouchPaddle(t);
+    const p = touchPosToCanvas(t);
+    state.touchTargetX = p.x - paddleW()/2;
   }, { passive: false });
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     const t = e.touches[0];
     if (!t) return;
-    if (Math.abs(t.clientX - touchStartX) > 6 || Math.abs(t.clientY - touchStartY) > 6) touchMoved = true;
-    applyTouchPaddle(t);
+    if (Math.abs(t.clientX - touchStartX) > 8 || Math.abs(t.clientY - touchStartY) > 8) touchMoved = true;
+    const p = touchPosToCanvas(t);
+    state.touchTargetX = p.x - paddleW()/2;
   }, { passive: false });
   canvas.addEventListener('touchend', e => {
     e.preventDefault();
+    state.touchTargetX = null;  // stop sliding paddle
     if (touchMoved) return;
-    // It was a tap, not a drag → fire the click-equivalent action.
+    // It was a tap, not a drag. Figure out what to do.
+    const rect = canvas.getBoundingClientRect();
+    const tapY = (touchStartY - rect.top) * (H / rect.height);
     if (!gameStarted) { dismissTitle(); return; }
     if (state.levelTransitioning) { advanceToNextLevel(); return; }
     if (state.over || state.won) { restart(); return; }
-    if (state.ball.stuck) launchBall();
+    if (state.ball.stuck) { launchBall(); return; }
+    // Ball is in flight. Tap in top 60% of canvas (well above the paddle) = pause.
+    // Below that we ignore — too close to where the finger naturally lands.
+    if (tapY < H * 0.60) setPaused(!state.paused);
   }, { passive: false });
 
   function restart() {
@@ -2366,6 +2449,14 @@
       const kspeed = 9;
       if (state.keys.left)  state.paddleX -= kspeed;
       if (state.keys.right) state.paddleX += kspeed;
+      // Touch input: slide toward the finger's target at a steady speed (no teleport)
+      if (state.touchTargetX !== null) {
+        const targetClamped = Math.max(0, Math.min(W - paddleW(), state.touchTargetX));
+        const diff = targetClamped - state.paddleX;
+        const moveSpeed = 14;
+        if (Math.abs(diff) <= moveSpeed) state.paddleX = targetClamped;
+        else                              state.paddleX += Math.sign(diff) * moveSpeed;
+      }
       state.paddleX = Math.max(0, Math.min(W - paddleW(), state.paddleX));
       if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
     }
@@ -2400,7 +2491,7 @@
           const tx = target.x + target.w/2, ty = target.y + target.h/2;
           const dx = tx - state.ball.x, dy = ty - state.ball.y;
           const d = Math.hypot(dx, dy) || 1;
-          const speed = 5.5;  // slower homing speed (was 9)
+          const speed = 6.5;  // homing speed
           state.ball.vx = (dx / d) * speed;
           state.ball.vy = (dy / d) * speed;
           state.ball.x += state.ball.vx;
@@ -2760,9 +2851,16 @@
     if (state.papa.active && photos.papaPaddle) {
       const layout = papaPaddleLayout();
       const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 180);
+      // Use canvas shadowBlur (cross-browser, works on iOS Safari where
+      // ctx.filter drop-shadow can be flaky) — the image has a real alpha
+      // channel so the shadow traces the silhouette, not the bounding box.
       ctx.save();
-      ctx.filter = `drop-shadow(0 0 ${10 + pulse*8}px rgba(91, 210, 255, 0.95))`
-                 + ` drop-shadow(0 0 ${20 + pulse*12}px rgba(91, 210, 255, 0.55))`;
+      ctx.shadowColor = 'rgba(91, 210, 255, 0.95)';
+      ctx.shadowBlur  = 22 + pulse * 14;
+      ctx.drawImage(photos.papaPaddle, px, layout.py, layout.drawW, layout.drawH);
+      // Second pass adds an extra glow halo without re-drawing visually.
+      ctx.shadowBlur = 36 + pulse * 18;
+      ctx.shadowColor = 'rgba(91, 210, 255, 0.55)';
       ctx.drawImage(photos.papaPaddle, px, layout.py, layout.drawW, layout.drawH);
       ctx.restore();
       return;
@@ -3327,12 +3425,11 @@
       ctx.shadowColor = 'rgba(91, 210, 255, 0.95)';
       ctx.shadowBlur = 14;
       ctx.fillStyle = `rgba(180, 230, 255, ${blink})`;
-      ctx.fillText('PRESS  SPACE  TO  LAUNCH', W/2, 360);
+      ctx.fillText(IS_TOUCH ? 'TAP  TO  LAUNCH' : 'PRESS  SPACE  TO  LAUNCH', W/2, 360);
       ctx.shadowBlur = 0;
-      // Tiny subtitle in pixel font
       ctx.font = '10px "Press Start 2P", monospace';
       ctx.fillStyle = `rgba(140, 190, 235, ${0.55 * blink})`;
-      ctx.fillText('OR CLICK TO LAUNCH', W/2, 388);
+      if (!IS_TOUCH) ctx.fillText('OR CLICK TO LAUNCH', W/2, 388);
       ctx.restore();
     }
     if (state.paused) {
