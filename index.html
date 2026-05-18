@@ -13,14 +13,39 @@
     color: #eef;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
+  /* Scale-to-fit: the wrap is positioned absolutely and scaled by a CSS variable
+     that JS recomputes on resize/orientation change. The natural design size
+     is ~1180 × 700; we never scale up past 1× to avoid blurry pixels. */
   #wrap {
-    height: 100%;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(var(--game-scale, 1));
+    transform-origin: center center;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 12px;
+  }
+  canvas { touch-action: none; }
+  /* Landscape-rotation prompt — visible only on phone-sized viewports held in portrait. */
+  #orientation-overlay {
+    position: fixed; inset: 0; background: #02061a;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 10000; padding: 24px; text-align: center;
+    color: #88c4ff; font-family: "Press Start 2P", monospace;
+  }
+  #orientation-overlay.show { display: flex; }
+  .rotate-icon { font-size: 88px; margin-bottom: 32px; animation: rotate-hint 1.6s ease-in-out infinite; }
+  .rotate-text { font-size: 14px; letter-spacing: 2px; line-height: 1.8; max-width: 320px; }
+  @keyframes rotate-hint {
+    0%, 100% { transform: rotate(-15deg); }
+    50%      { transform: rotate(75deg); }
   }
   #layout {
     display: flex;
@@ -597,6 +622,11 @@
   <div id="hint"><b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH / PAUSE</div>
 </div>
 
+<div id="orientation-overlay">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-text">PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE</div>
+</div>
+
 <div id="title-screen">
   <div class="title-content">
     <img id="title-logo" src="KaiBreakout Logo.png" alt="Kai Breakout" />
@@ -611,6 +641,30 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
+
+  // ---------- Responsive: scale-to-fit + orientation prompt ----------
+  // Natural design size of the layout (sidebar + canvas + hint, with margins).
+  const NATURAL_W = 1180;
+  const NATURAL_H = 700;
+  function updateGameScale() {
+    const sx = window.innerWidth  / NATURAL_W;
+    const sy = window.innerHeight / NATURAL_H;
+    // Never upscale past 1 — pixel art looks crispest at native; cap to 1× max.
+    const s = Math.min(sx, sy, 1);
+    document.documentElement.style.setProperty('--game-scale', s.toFixed(4));
+  }
+  const orientationEl = document.getElementById('orientation-overlay');
+  function checkOrientation() {
+    // Only nag on phone-sized viewports (under 900px wide) when held in portrait.
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const isSmall    = Math.max(window.innerWidth, window.innerHeight) < 900 ||
+                       Math.min(window.innerWidth, window.innerHeight) < 500;
+    orientationEl.classList.toggle('show', isPortrait && isSmall);
+  }
+  window.addEventListener('resize', () => { updateGameScale(); checkOrientation(); });
+  window.addEventListener('orientationchange', () => { updateGameScale(); checkOrientation(); });
+  updateGameScale();
+  checkOrientation();
 
   const titleScreen = document.getElementById('title-screen');
   const titleStartBtn = document.getElementById('title-start');
@@ -1126,23 +1180,10 @@
     const drawW = paddleW();
     const drawH = Math.min(drawW * (ih / iw), 220);
     const scale = drawH / ih;
-    // contentTopY/BotY are pixel y-coords of the character within the source image.
-    let charTopInImg, charBotInImg;
-    if (img.contentTopY !== undefined && img.contentBotY !== undefined) {
-      charTopInImg = img.contentTopY;
-      charBotInImg = img.contentBotY;
-    } else {
-      // Fallback when pixel access is blocked (Chrome file:// CORS).
-      // For your 1536×1024 papapaddle.png the character (lying flat) occupies
-      // roughly the middle 40-45% of the image vertically — not the full middle 65%.
-      // Tune these two numbers if the alignment is still off.
-      //  • LOWER charTopInImg → ball bounces HIGHER (further from floor)
-      //  • RAISE charTopInImg → ball bounces LOWER (closer to character)
-      //  • LOWER charBotInImg → character DROPS lower toward floor
-      //  • RAISE charBotInImg → character LIFTS up away from floor
-      charTopInImg = ih * 0.42;   // character starts ~42% from top of image
-      charBotInImg = ih * 0.72;   // character ends ~72% from top of image
-    }
+    // Always use the same fixed fractions whether running locally or hosted,
+    // so the look is identical in both. (Pixel measurement intentionally skipped here.)
+    const charTopInImg = ih * 0.42;
+    const charBotInImg = ih * 0.72;
     const charTopInDraw = charTopInImg * scale;
     const charBotInDraw = charBotInImg * scale;
     // Position image so character's visible BOTTOM lands exactly at the canvas floor.
@@ -2073,6 +2114,44 @@
     if (state.ball.stuck) launchBall();
   });
 
+  // ---------- Touch controls (mobile / iPad) ----------
+  // Finger DRAG = paddle position; TAP = launch / dismiss / restart / next-level.
+  // We distinguish drag vs tap by whether the finger moved more than 6px.
+  let touchStartX = 0, touchStartY = 0, touchMoved = false;
+  function touchPosToCanvasX(touch) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    return (touch.clientX - rect.left) * scaleX;
+  }
+  function applyTouchPaddle(touch) {
+    const x = touchPosToCanvasX(touch);
+    state.paddleX = Math.max(0, Math.min(W - paddleW(), x - paddleW()/2));
+    if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
+  }
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (!t) return;
+    touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
+    applyTouchPaddle(t);
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - touchStartX) > 6 || Math.abs(t.clientY - touchStartY) > 6) touchMoved = true;
+    applyTouchPaddle(t);
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (touchMoved) return;
+    // It was a tap, not a drag → fire the click-equivalent action.
+    if (!gameStarted) { dismissTitle(); return; }
+    if (state.levelTransitioning) { advanceToNextLevel(); return; }
+    if (state.over || state.won) { restart(); return; }
+    if (state.ball.stuck) launchBall();
+  }, { passive: false });
+
   function restart() {
     state.score = 0; state.lives = 3; state.over = false; state.won = false;
     setScore(0); setLives(3);
@@ -2410,6 +2489,8 @@
           }
         } else {
           if (state.madMama.active) endMadMama();
+          if (state.papa.active)    endPapa();
+          if (state.akhil.active)   endAkhil();
           loseLife();
         }
       }
@@ -2920,7 +3001,7 @@
     if (it.type === 'heart')         drawHeartItem(it);
     else if (it.type === 'superKai') drawSuperKaiItem(it);
     else if (it.type === 'papa')     drawPhotoItem(it, photos.papaItem, 'rgba(91, 210, 255, 0.95)');
-    else if (it.type === 'akhil')    drawPhotoItem(it, photos.akhilGlasses, 'rgba(255, 220, 60, 0.95)', 1.55);
+    else if (it.type === 'akhil')    drawPhotoItem(it, photos.akhilGlasses, 'rgba(255, 220, 60, 0.95)', 1.85);
     else                              drawBombItem(it);
   }
   // Generic falling-item that uses an image + glow. `scaleMult` lets callers
@@ -3397,12 +3478,33 @@
     ctx.restore();
   }
 
-  function frame() {
-    // Wrap the whole frame in try/catch — any unhandled error MUST NOT break
-    // the RAF loop, or the game freezes with a blank canvas (was the bug).
+  // Fixed-timestep accumulator so simulation runs at a consistent 60 ticks/sec
+  // regardless of how fast the device's display refreshes. On a slow phone
+  // where RAF can drop below 60 Hz, this prevents the game from running in
+  // slow motion (ball moves the right amount of pixels per real second).
+  const SIM_TICK_MS = 1000 / 60;
+  let lastFrameTime = 0;
+  let simAccumulator = 0;
+  function frame(now) {
+    if (!now) now = performance.now();
     try {
+      // Run zero, one, or more simulation ticks to catch up to real time.
+      if (lastFrameTime) {
+        let delta = now - lastFrameTime;
+        if (delta > 200) delta = 200;  // cap after tab-switch / pause
+        simAccumulator += delta;
+      }
+      lastFrameTime = now;
+      let ticks = 0;
+      while (simAccumulator >= SIM_TICK_MS && ticks < 5) {
+        update();
+        simAccumulator -= SIM_TICK_MS;
+        ticks++;
+      }
+      if (simAccumulator > SIM_TICK_MS * 3) simAccumulator = 0; // huge backlog → drop
+      // Wrap the whole frame in try/catch — any unhandled error MUST NOT break
+      // the RAF loop, or the game freezes with a blank canvas (was the bug).
       ctx.clearRect(0, 0, W, H);
-      update();
       drawSnowHearts();
       drawZigzagBorder();
       drawBricks();
