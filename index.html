@@ -8,7 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Kai Breakout" />
 <meta name="theme-color" content="#0f1226" />
-<link rel="apple-touch-icon" href="KaiBreakout Logo.png" />
+<link rel="apple-touch-icon" href="webapp%20icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="webapp%20icon.png" />
 <link rel="icon" type="image/png" href="kaiball.png" />
 <title>Kai Breakout</title>
 <style>
@@ -53,17 +54,29 @@
   canvas { touch-action: none; }
   /* Landscape-rotation prompt — visible only on phone-sized viewports held in portrait. */
   #orientation-overlay {
-    position: fixed; inset: 0; background: #02061a;
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at center, #0a1842 0%, #050a22 70%, #02061a 100%);
     display: none; flex-direction: column; align-items: center; justify-content: center;
     z-index: 10000; padding: 24px; text-align: center;
     color: #88c4ff; font-family: "Press Start 2P", monospace;
   }
   #orientation-overlay.show { display: flex; }
-  .rotate-icon { font-size: 88px; margin-bottom: 32px; animation: rotate-hint 1.6s ease-in-out infinite; }
-  .rotate-text { font-size: 14px; letter-spacing: 2px; line-height: 1.8; max-width: 320px; }
+  .orient-brand {
+    font-size: 12px; letter-spacing: 4px; color: #5bd2ff;
+    text-shadow: 0 0 10px rgba(91, 210, 255, 0.65); margin-bottom: 32px;
+  }
+  .rotate-icon { font-size: 80px; margin-bottom: 28px; line-height: 1; }
+  .rotate-icon.rotate-anim { animation: rotate-hint 1.6s ease-in-out infinite; }
+  .rotate-icon.expand-anim { animation: expand-hint 1.6s ease-in-out infinite; letter-spacing: 0; }
+  .rotate-text { font-size: 13px; letter-spacing: 2px; line-height: 1.9; max-width: 360px;
+                 text-shadow: 0 0 12px rgba(91, 210, 255, 0.45); }
   @keyframes rotate-hint {
     0%, 100% { transform: rotate(-15deg); }
     50%      { transform: rotate(75deg); }
+  }
+  @keyframes expand-hint {
+    0%, 100% { letter-spacing: 6px; }
+    50%      { letter-spacing: 36px; }
   }
   #layout {
     display: flex;
@@ -86,7 +99,10 @@
     display: block;
     margin: -50px auto -28px;  /* pull top up so the logo aligns with the canvas top */
     filter: drop-shadow(0 10px 30px rgba(0, 180, 255, 0.6));
+    cursor: pointer;
+    transition: transform 80ms ease-out;
   }
+  #logo.tap-pulse { transform: scale(1.04); filter: drop-shadow(0 0 18px rgba(91, 210, 255, 0.95)) drop-shadow(0 10px 30px rgba(0, 180, 255, 0.6)); }
   #stats {
     display: flex;
     flex-direction: column;
@@ -325,6 +341,14 @@
   @keyframes title-pulse {
     0%, 100% { box-shadow: 0 0 30px rgba(91, 210, 255, 0.85), inset 0 2px 0 rgba(255,255,255,0.6); }
     50%      { box-shadow: 0 0 50px rgba(91, 210, 255, 1), inset 0 2px 0 rgba(255,255,255,0.7); }
+  }
+  /* On short viewports (phone landscape) compact the title-screen so START GAME
+     button doesn't overlap the copyright footer. */
+  @media (max-height: 480px) {
+    #title-logo    { max-height: 44vh; max-width: 70vw; }
+    .title-tagline { font-size: 10px; letter-spacing: 3px; }
+    #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
+    .title-content { gap: 8px; margin-top: -3vh; }
   }
   .title-footer {
     position: absolute;
@@ -641,8 +665,9 @@
 </div>
 
 <div id="orientation-overlay">
-  <div class="rotate-icon">📱</div>
-  <div id="orientation-msg" class="rotate-text">PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE</div>
+  <div class="orient-brand">KAI&nbsp;&nbsp;BREAKOUT</div>
+  <div id="orientation-icon" class="rotate-icon rotate-anim">📱</div>
+  <div id="orientation-msg" class="rotate-text">PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE<br>TO PLAY</div>
 </div>
 
 <div id="title-screen">
@@ -670,13 +695,15 @@
   const hintEl = document.getElementById('hint');
   if (hintEl) {
     hintEl.innerHTML = IS_TOUCH
-      ? '<b>DRAG</b> PADDLE &nbsp;·&nbsp; <b>TAP</b> LAUNCH &nbsp;·&nbsp; <b>TAP HIGH</b> PAUSE'
-      : '<b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH / PAUSE';
+      ? '<b>DRAG</b> PADDLE &nbsp;·&nbsp; <b>TAP</b> LAUNCH'
+      : '<b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH';
   }
 
   // ---------- Responsive: scale-to-fit + orientation/expand prompt ----------
-  const NATURAL_W = 1180;
-  const NATURAL_H = 700;
+  // Slightly oversized natural-design dims so every screen gets a small safety
+  // margin (fixes iPad mini standalone cutoff on the sides).
+  const NATURAL_W = 1240;
+  const NATURAL_H = 740;
   function updateGameScale() {
     // In standalone (PWA) mode the body has safe-area padding that shrinks the
     // viewable area; account for it via clientWidth/Height instead of innerWidth.
@@ -687,31 +714,37 @@
     const s = Math.min(sx, sy, 1);
     document.documentElement.style.setProperty('--game-scale', s.toFixed(4));
   }
-  const orientationEl  = document.getElementById('orientation-overlay');
-  const orientationMsg = document.getElementById('orientation-msg');
+  const orientationEl   = document.getElementById('orientation-overlay');
+  const orientationMsg  = document.getElementById('orientation-msg');
+  const orientationIcon = document.getElementById('orientation-icon');
   function checkOrientation() {
+    // Skip everything until the player has dismissed the title screen — the
+    // title page should display fine in both portrait and landscape.
+    let started = false;
+    try { started = gameStarted; } catch (_) {}
+    if (!started) { orientationEl.classList.remove('show'); return; }
     const w = window.innerWidth, h = window.innerHeight;
     const portrait = h > w;
-    // The wrap needs ~1180×700 of viewable area to look right. If either dim
-    // is way smaller than that we want to show a prompt.
-    const tooSmallEither = w < 700 || h < 500;
+    const tooNarrow = w < 760;
+    const tooShort  = h < 520;
     let bad = false;
-    let mode = 'rotate';  // 'rotate' for mobile, 'expand' for desktop
-    if (IS_TOUCH && portrait) {
-      bad = true; mode = 'rotate';
-    } else if (!IS_TOUCH && portrait && tooSmallEither) {
-      // Laptop window is too tall/narrow — ask user to widen the browser
-      bad = true; mode = 'expand';
-    }
+    let mode = 'rotate';
+    if (IS_TOUCH && portrait)                    { bad = true; mode = 'rotate'; }
+    else if (!IS_TOUCH && (tooNarrow || tooShort)) { bad = true; mode = 'expand'; }
     orientationEl.classList.toggle('show', bad);
-    if (bad && orientationMsg) {
-      orientationMsg.innerHTML = (mode === 'rotate')
-        ? 'PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE'
-        : 'PLEASE WIDEN<br>YOUR BROWSER<br>WINDOW';
+    if (bad && orientationMsg && orientationIcon) {
+      if (mode === 'rotate') {
+        orientationIcon.textContent = '📱';
+        orientationIcon.className = 'rotate-icon rotate-anim';
+        orientationMsg.innerHTML = 'PLEASE ROTATE<br>YOUR DEVICE TO<br>LANDSCAPE MODE<br>TO PLAY';
+      } else {
+        // Expand-browser icon — two arrows that pulse outward via letter-spacing
+        orientationIcon.textContent = '← →';
+        orientationIcon.className = 'rotate-icon expand-anim';
+        orientationMsg.innerHTML = 'PLEASE WIDEN<br>YOUR BROWSER<br>WINDOW<br>TO PLAY';
+      }
     }
-    // Auto-pause the game whenever the viewport goes "bad" mid-play.
-    // Wrap in try/catch because state may be in TDZ during the very first
-    // call at IIFE init time (before `const state = {...}` is evaluated).
+    // Auto-pause mid-game when viewport goes bad.
     if (bad) {
       try {
         if (gameStarted && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
@@ -747,8 +780,9 @@
     if (gameStarted) return;
     gameStarted = true;
     titleScreen.classList.add('hidden');
-    // Remove from DOM after fade so it can't accidentally re-intercept clicks.
     setTimeout(() => { titleScreen.style.display = 'none'; }, 500);
+    // Now that we're in gameplay, re-check orientation (could already be bad).
+    checkOrientation();
   }
   // Multiple reliable dismiss paths: button, overlay click, space key, any key.
   titleStartBtn.addEventListener('click', e => { e.stopPropagation(); dismissTitle(); });
@@ -1108,6 +1142,103 @@
     n.start(now);
   }
 
+  // ---------- Polish sounds: level/win jingles + score tick ----------
+  // Soft, short, retro-arcade flavored cues. Volumes deliberately kept well
+  // below SFX peaks so they feel like sparkle, not interruption.
+  function playLevelJingle() {
+    const ctx = ensureAudio();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    // Bright ascending arpeggio: C5 → E5 → G5 → C6 (major)
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    const stepMs = 0.085;
+    notes.forEach((freq, i) => {
+      const t0 = now + i * stepMs;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.18, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + 0.26);
+    });
+    // Final sparkle: high sine on top of the last note
+    const sparkleT = now + notes.length * stepMs;
+    const s = ctx.createOscillator();
+    const sg = ctx.createGain();
+    s.type = 'sine';
+    s.frequency.setValueAtTime(1568, sparkleT); // G6
+    sg.gain.setValueAtTime(0, sparkleT);
+    sg.gain.linearRampToValueAtTime(0.10, sparkleT + 0.02);
+    sg.gain.exponentialRampToValueAtTime(0.001, sparkleT + 0.45);
+    s.connect(sg).connect(ctx.destination);
+    s.start(sparkleT); s.stop(sparkleT + 0.5);
+  }
+  function playWinJingle() {
+    const ctx = ensureAudio();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    // Longer fanfare: C5–E5–G5–C6 (fast) then hold on C6 with E6/G6 sparkle.
+    const fanfare = [523.25, 659.25, 783.99, 1046.50];
+    fanfare.forEach((freq, i) => {
+      const t0 = now + i * 0.10;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.14, t0 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.20);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + 0.22);
+    });
+    // Held triad: C6, E6, G6 ringing out together
+    const holdT = now + 0.42;
+    const triad = [1046.50, 1318.51, 1567.98];
+    triad.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, holdT);
+      g.gain.setValueAtTime(0, holdT);
+      g.gain.linearRampToValueAtTime(0.10 - i * 0.015, holdT + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, holdT + 0.9);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(holdT); osc.stop(holdT + 0.95);
+    });
+    // Sub thump for body
+    const sub = ctx.createOscillator();
+    const sg = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(130.81, now);
+    sub.frequency.exponentialRampToValueAtTime(65, now + 0.4);
+    sg.gain.setValueAtTime(0.18, now);
+    sg.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    sub.connect(sg).connect(ctx.destination);
+    sub.start(now); sub.stop(now + 0.55);
+  }
+  // Tiny, short blip used to "tick" alongside score-counter animation.
+  // Frequency rises subtly with progress so a rapid counter feels like a slot
+  // machine rolling up.
+  function playScoreTick(progress) {
+    const ctx = ensureAudio();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    const base = 520; // C5-ish
+    const freq = base + (progress || 0) * 380; // climbs as score reaches target
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, now);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.045, now + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(now); osc.stop(now + 0.06);
+  }
+
   // Chill background music for normal play — pentatonic, soft sines.
   // Target: ~70% perceived loudness vs Nozomi. Nozomi peak gain ≈ 0.32; chill peaks ≈ 0.045.
   let chillTimer = null;
@@ -1464,7 +1595,7 @@
     if (!state.ball.stuck) return;
     // Speed curve for 7 levels. Bumped ~20% to feel right at the 60-tick/sec
     // fixed sim rate (some devices were running RAF faster before).
-    const speed = 4.8 + (state.level - 1) * 0.5;
+    const speed = 5.3 + (state.level - 1) * 0.55;
     const angle = (-Math.PI/2) + (Math.random()-0.5) * 0.6; // mostly up
     state.ball.vx = Math.cos(angle) * speed;
     state.ball.vy = Math.sin(angle) * speed;
@@ -1515,12 +1646,14 @@
     state.fallingItem = null;
     state.extras.length = 0;
     if (clearedLevel < MAX_LEVEL) {
+      playLevelJingle();
       showLevelComplete(clearedLevel, bricksPts, flat, timeBonus);
     } else {
       // Beat the whole game!
       state.won = true;
       state.levelTransitioning = false;
       stopChillMusic();
+      playWinJingle();
       showEndgame('win');
     }
   }
@@ -1754,12 +1887,24 @@
     levelCompleteEl.classList.add('hidden');
   }
   // Smoothly tween a DOM number from->to over `duration` ms, then call `done`.
+  // Also plays subtle "tick" blips paced across the animation so the score-roll
+  // feels like a slot-machine counter (frequency rises with progress).
   function animateNumber(el, from, to, duration, done) {
     const start = performance.now();
+    // Skip ticks entirely for trivial counts so we don't spam audio for tiny values.
+    const range = Math.abs(to - from);
+    const TICK_COUNT = range < 5 ? 0 : Math.min(12, Math.max(4, Math.round(duration / 70)));
+    let nextTickIdx = 0;
     function step(now) {
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - t, 3);  // easeOutCubic
       el.textContent = Math.round(from + (to - from) * eased).toString();
+      if (TICK_COUNT > 0) {
+        while (nextTickIdx < TICK_COUNT && eased >= (nextTickIdx + 1) / TICK_COUNT) {
+          playScoreTick((nextTickIdx + 1) / TICK_COUNT);
+          nextTickIdx++;
+        }
+      }
       if (t < 1) requestAnimationFrame(step);
       else if (done) done();
     }
@@ -2147,6 +2292,46 @@
     if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
   });
   function setPaused(p) { state.paused = p; }
+  // ---------- Pause button (top-right corner of canvas) ----------
+  const PAUSE_BTN = { size: 44, pad: 12 };
+  function pauseBtnRect() {
+    return { x: W - PAUSE_BTN.size - PAUSE_BTN.pad, y: PAUSE_BTN.pad, s: PAUSE_BTN.size };
+  }
+  function isInPauseButton(cx, cy) {
+    const r = pauseBtnRect();
+    return cx >= r.x && cx <= r.x + r.s && cy >= r.y && cy <= r.y + r.s;
+  }
+  function canPause() {
+    return gameStarted && !state.over && !state.won && !state.levelTransitioning;
+  }
+  function drawPauseButton() {
+    if (!canPause()) return;
+    const r = pauseBtnRect();
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 22, 50, 0.78)';
+    ctx.strokeStyle = 'rgba(91, 210, 255, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(r.x, r.y, r.s, r.s, 9);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#9ad7ff';
+    ctx.shadowColor = 'rgba(91, 210, 255, 0.55)';
+    ctx.shadowBlur = 8;
+    if (state.paused) {
+      // Play icon (triangle)
+      ctx.beginPath();
+      ctx.moveTo(r.x + 15, r.y + 11);
+      ctx.lineTo(r.x + 15, r.y + r.s - 11);
+      ctx.lineTo(r.x + r.s - 11, r.y + r.s/2);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Pause icon (two bars)
+      ctx.fillRect(r.x + 13, r.y + 11, 6, r.s - 22);
+      ctx.fillRect(r.x + r.s - 19, r.y + 11, 6, r.s - 22);
+    }
+    ctx.restore();
+  }
 
   window.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft')  state.keys.left  = true;
@@ -2182,8 +2367,73 @@
     if (e.key === 'ArrowLeft')  state.keys.left  = false;
     if (e.key === 'ArrowRight') state.keys.right = false;
   });
-  canvas.addEventListener('click', () => {
+  // ---------- Logo tap → spawn an item (cheat / touch-testing) ----------
+  // Tap the Kai Breakout logo N times within ~800 ms of the last tap to spawn:
+  //   1 = SUPERKAI, 2 = PAPA, 3 = AKHIL, 4 = MAD MAMA, 5 = NOZOMI
+  // Each tap also pulses the logo so the player gets visual feedback while
+  // counting taps. The counter resets if you stop tapping (or after 5).
+  (function setupLogoTapSpawn() {
+    const logoEl = document.getElementById('logo');
+    if (!logoEl) return;
+    let taps = 0;
+    let resetTimer = null;
+    const ITEM_BY_TAP = ['superKai', 'papa', 'akhil', 'bomb', 'heart']; // index 0..4 = 1..5 taps
+    function fire() {
+      // Don't spawn during title or game-over/win/level-transition or while another mode is up.
+      if (!gameStarted) return;
+      if (state.fallingItem || state.nozomi.active || state.madMama.active
+          || state.superKai.active || state.papa.active || state.akhil.active
+          || state.over || state.won || state.levelTransitioning) return;
+      const t = Math.min(taps, ITEM_BY_TAP.length);
+      if (t >= 1) spawnFallingItem(ITEM_BY_TAP[t - 1]);
+    }
+    function onTap(ev) {
+      // Stop default to avoid the touchstart-then-click double-fire on mobile.
+      ev.preventDefault();
+      taps++;
+      // Pulse animation
+      logoEl.classList.remove('tap-pulse');
+      // Force reflow so the class re-applies (otherwise back-to-back taps don't pulse).
+      void logoEl.offsetWidth;
+      logoEl.classList.add('tap-pulse');
+      setTimeout(() => logoEl.classList.remove('tap-pulse'), 140);
+      // 5 taps = top tier — fire immediately.
+      if (taps >= 5) {
+        fire();
+        taps = 0;
+        if (resetTimer) clearTimeout(resetTimer);
+        resetTimer = null;
+        return;
+      }
+      // Otherwise wait for the idle window to close, then fire whatever taps we got.
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        fire();
+        taps = 0;
+        resetTimer = null;
+      }, 800);
+    }
+    logoEl.addEventListener('click', onTap);
+    // Touch: handle on touchstart for snappy feedback; also preventDefault to
+    // suppress the synthetic click that would otherwise double-count.
+    logoEl.addEventListener('touchstart', onTap, { passive: false });
+  })();
+  // Helper: convert mouse event to canvas-space coords (matches touch handler logic).
+  function mousePosToCanvas(ev) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (ev.clientX - rect.left) * (W / rect.width),
+      y: (ev.clientY - rect.top)  * (H / rect.height),
+    };
+  }
+  canvas.addEventListener('click', ev => {
     if (!gameStarted) { dismissTitle(); return; }
+    // Pause button hit?
+    const p = mousePosToCanvas(ev);
+    if (canPause() && isInPauseButton(p.x, p.y)) {
+      setPaused(!state.paused);
+      return;
+    }
     if (state.ball.stuck) launchBall();
   });
 
@@ -2196,6 +2446,7 @@
   //   • Tap (no movement, HIGH Y — top 60% of canvas) during active play = pause.
   state.touchTargetX = null;
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
+  let touchOnPauseBtn = false;
   function touchPosToCanvas(touch) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -2209,30 +2460,36 @@
     if (!t) return;
     touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
     const p = touchPosToCanvas(t);
-    state.touchTargetX = p.x - paddleW()/2;
+    // If the tap lands inside the pause button area, treat it as a button press —
+    // don't steer the paddle toward the corner.
+    touchOnPauseBtn = canPause() && isInPauseButton(p.x, p.y);
+    if (!touchOnPauseBtn) state.touchTargetX = p.x - paddleW()/2;
   }, { passive: false });
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     const t = e.touches[0];
     if (!t) return;
     if (Math.abs(t.clientX - touchStartX) > 8 || Math.abs(t.clientY - touchStartY) > 8) touchMoved = true;
+    if (touchOnPauseBtn) return;  // pause-button press — don't move paddle while finger drags
     const p = touchPosToCanvas(t);
     state.touchTargetX = p.x - paddleW()/2;
   }, { passive: false });
   canvas.addEventListener('touchend', e => {
     e.preventDefault();
     state.touchTargetX = null;  // stop sliding paddle
+    // Pause-button tap: release within button, no significant drag → toggle pause.
+    if (touchOnPauseBtn) {
+      touchOnPauseBtn = false;
+      if (!touchMoved) { setPaused(!state.paused); return; }
+      return;
+    }
     if (touchMoved) return;
     // It was a tap, not a drag. Figure out what to do.
-    const rect = canvas.getBoundingClientRect();
-    const tapY = (touchStartY - rect.top) * (H / rect.height);
     if (!gameStarted) { dismissTitle(); return; }
     if (state.levelTransitioning) { advanceToNextLevel(); return; }
     if (state.over || state.won) { restart(); return; }
     if (state.ball.stuck) { launchBall(); return; }
-    // Ball is in flight. Tap in top 60% of canvas (well above the paddle) = pause.
-    // Below that we ignore — too close to where the finger naturally lands.
-    if (tapY < H * 0.60) setPaused(!state.paused);
+    // Pause is now triggered by the dedicated corner button — no canvas-tap pause.
   }, { passive: false });
 
   function restart() {
@@ -3433,12 +3690,16 @@
       ctx.restore();
     }
     if (state.paused) {
+      // Slim, low-emphasis "PAUSED" — the pause/play button is the source of truth
+      // for state; this is just a quick subtitle so the player knows nothing's frozen
+      // by a bug.
       ctx.save();
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.font = 'bold 36px "Press Start 2P", monospace';
+      ctx.fillStyle = 'rgba(180, 230, 255, 0.78)';
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(91, 210, 255, 0.8)';
-      ctx.shadowBlur = 16;
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(91, 210, 255, 0.55)';
+      ctx.shadowBlur = 10;
       ctx.fillText('PAUSED', W/2, H/2);
       ctx.restore();
     }
@@ -3619,6 +3880,7 @@
       drawAkhilHud();
       drawHelp();
       drawCanvasFlash();
+      drawPauseButton();
     } catch (err) {
       console.error('[Kai Breakout] frame error:', err);
     }
