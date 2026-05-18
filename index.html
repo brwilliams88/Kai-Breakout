@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Kai Breakout" />
 <meta name="theme-color" content="#0f1226" />
+<!-- "precomposed" tells iOS the icon is already styled — DO NOT add a glossy
+     overlay, white background, or auto-mask around the artwork. -->
+<link rel="apple-touch-icon-precomposed" href="webapp%20icon.png" />
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="webapp%20icon.png" />
 <link rel="apple-touch-icon" href="webapp%20icon.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="webapp%20icon.png" />
 <link rel="icon" type="image/png" href="kaiball.png" />
@@ -65,7 +69,17 @@
     font-size: 12px; letter-spacing: 4px; color: #5bd2ff;
     text-shadow: 0 0 10px rgba(91, 210, 255, 0.65); margin-bottom: 32px;
   }
-  .rotate-icon { font-size: 80px; margin-bottom: 28px; line-height: 1; }
+  /* Use inline-block + explicit line-height with extra room so the phone glyph
+     doesn't get clipped at the bottom when rotated. transform-origin keeps the
+     pivot at the visual center so the emoji rotates in place. */
+  .rotate-icon {
+    font-size: 80px;
+    margin-bottom: 28px;
+    line-height: 1.4;
+    display: inline-block;
+    transform-origin: 50% 50%;
+    padding: 10px 0;
+  }
   .rotate-icon.rotate-anim { animation: rotate-hint 1.6s ease-in-out infinite; }
   .rotate-icon.expand-anim { animation: expand-hint 1.6s ease-in-out infinite; letter-spacing: 0; }
   .rotate-text { font-size: 13px; letter-spacing: 2px; line-height: 1.9; max-width: 360px;
@@ -99,10 +113,16 @@
     display: block;
     margin: -50px auto -28px;  /* pull top up so the logo aligns with the canvas top */
     filter: drop-shadow(0 10px 30px rgba(0, 180, 255, 0.6));
-    cursor: pointer;
-    transition: transform 80ms ease-out;
+    transition: transform 110ms ease-out, filter 110ms ease-out;
+    /* --pulse-color is set inline by JS to match the activated power-up's glow. */
   }
-  #logo.tap-pulse { transform: scale(1.04); filter: drop-shadow(0 0 18px rgba(91, 210, 255, 0.95)) drop-shadow(0 10px 30px rgba(0, 180, 255, 0.6)); }
+  #logo.tap-pulse {
+    transform: scale(1.06);
+    filter:
+      drop-shadow(0 0 22px var(--pulse-color, rgba(91, 210, 255, 0.95)))
+      drop-shadow(0 0 8px  var(--pulse-color, rgba(91, 210, 255, 0.95)))
+      drop-shadow(0 10px 30px rgba(0, 180, 255, 0.6));
+  }
   #stats {
     display: flex;
     flex-direction: column;
@@ -179,23 +199,7 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.4);
     display: block;
   }
-  #hint {
-    font-family: "Press Start 2P", monospace;
-    font-size: 10px;
-    color: #6080b0;
-    margin-top: 6px;
-    letter-spacing: 2px;
-    text-shadow: 0 0 8px rgba(80, 140, 200, 0.3);
-  }
-  #hint b { color: #88c4ff; font-weight: normal; }
-  #hint .big-arrow {
-    font-family: "Orbitron", sans-serif;
-    font-size: 18px;
-    line-height: 0;
-    vertical-align: -2px;
-    letter-spacing: 4px;
-    font-weight: 800;
-  }
+  /* #hint removed — control instructions live in onboarding only. */
   #banner {
     position: absolute;
     top: 50%;
@@ -487,39 +491,50 @@
      text underneath stays legible. */
   .firework {
     position: absolute;
-    width: 3px;
-    height: 3px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     pointer-events: none;
     opacity: 0;
     background: currentColor;
+    box-shadow: 0 0 6px currentColor;
   }
+  /* Bigger radial starburst with 24 spokes (3 rings) + glow, much more visible. */
   @keyframes firework-burst {
     0% {
-      transform: scale(0.6);
+      transform: scale(0.4);
       opacity: 0;
       box-shadow:
+        0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor,
+        0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor,
         0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor,
         0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor,
         0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor,
         0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor, 0 0 0 currentColor;
     }
-    20% { opacity: 0.65; }
+    15% { opacity: 1; }
     100% {
-      transform: scale(1);
+      transform: scale(1.2);
       opacity: 0;
+      /* Outer ring (8 spokes at 120px) */
       box-shadow:
-        0     -70px 4px currentColor, 0     70px  4px currentColor,
-        -70px   0   4px currentColor, 70px  0    4px currentColor,
-        -50px -50px 4px currentColor, 50px  -50px 4px currentColor,
-        -50px  50px 4px currentColor, 50px  50px  4px currentColor,
-        -27px -65px 3px currentColor, 27px  -65px 3px currentColor,
-        -27px  65px 3px currentColor, 27px  65px  3px currentColor,
-        -65px -27px 3px currentColor, 65px  -27px 3px currentColor,
-        -65px  27px 3px currentColor, 65px  27px  3px currentColor;
+        0     -120px 8px currentColor,  0     120px  8px currentColor,
+        -120px  0    8px currentColor,  120px  0    8px currentColor,
+        -85px -85px 8px currentColor,   85px  -85px 8px currentColor,
+        -85px  85px 8px currentColor,   85px  85px  8px currentColor,
+        /* Middle ring (8 spokes at 95px, offset 22.5°) */
+        -46px -110px 6px currentColor,  46px  -110px 6px currentColor,
+        -46px  110px 6px currentColor,  46px  110px  6px currentColor,
+        -110px -46px 6px currentColor,  110px -46px  6px currentColor,
+        -110px  46px 6px currentColor,  110px  46px  6px currentColor,
+        /* Inner ring (8 spokes at 60px for extra density) */
+        0     -60px  5px currentColor,  0     60px   5px currentColor,
+        -60px  0     5px currentColor,  60px  0     5px currentColor,
+        -42px -42px  5px currentColor,  42px  -42px  5px currentColor,
+        -42px  42px  5px currentColor,  42px  42px   5px currentColor;
     }
   }
-  #endgame-overlay.win .firework { animation: firework-burst 1.6s ease-out infinite; opacity: 0.65; }
+  #endgame-overlay.win .firework { animation: firework-burst 1.8s ease-out infinite; opacity: 1; }
 
   /* Level complete popup */
   #level-complete {
@@ -661,7 +676,6 @@
       </div>
     </div>
   </div>
-  <div id="hint"></div>
 </div>
 
 <div id="orientation-overlay">
@@ -691,13 +705,7 @@
     window.matchMedia('(display-mode: standalone)').matches ||
     window.matchMedia('(display-mode: fullscreen)').matches ||
     window.navigator.standalone === true;
-  // Populate the bottom hint text based on input device.
-  const hintEl = document.getElementById('hint');
-  if (hintEl) {
-    hintEl.innerHTML = IS_TOUCH
-      ? '<b>DRAG</b> PADDLE &nbsp;·&nbsp; <b>TAP</b> LAUNCH'
-      : '<b>MOUSE</b> OR <b class="big-arrow">← →</b> PADDLE &nbsp;·&nbsp; <b>SPACE</b> LAUNCH';
-  }
+  // (Bottom hint text removed — controls are intuitive enough without it.)
 
   // ---------- Responsive: scale-to-fit + orientation/expand prompt ----------
   // Slightly oversized natural-design dims so every screen gets a small safety
@@ -744,10 +752,12 @@
         orientationMsg.innerHTML = 'PLEASE WIDEN<br>YOUR BROWSER<br>WINDOW<br>TO PLAY';
       }
     }
-    // Auto-pause mid-game when viewport goes bad.
+    // Auto-pause mid-game when viewport goes bad. Only matters once the ball
+    // is in play — before the first launch there's nothing to pause and showing
+    // "PAUSED" would conflict with the "PRESS SPACE TO LAUNCH" prompt.
     if (bad) {
       try {
-        if (gameStarted && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
+        if (gameStarted && !state.ball.stuck && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
           setPaused(true);
         }
       } catch (_) {}
@@ -766,7 +776,8 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
     try {
-      if (gameStarted && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
+      // Same rule as viewport auto-pause: only if the game is actually running.
+      if (gameStarted && !state.ball.stuck && !state.over && !state.won && !state.levelTransitioning && !state.paused) {
         setPaused(true);
       }
     } catch (_) {}
@@ -1145,79 +1156,156 @@
   // ---------- Polish sounds: level/win jingles + score tick ----------
   // Soft, short, retro-arcade flavored cues. Volumes deliberately kept well
   // below SFX peaks so they feel like sparkle, not interruption.
+  // Level-complete jingle: cheerful ~1.2s fanfare. Two ascending major arpeggios
+  // ending on a sustained triad with a high sparkle on top. Caller should wait
+  // ~LEVEL_JINGLE_MS before starting the score-counter animation so they don't
+  // overlap each other.
+  const LEVEL_JINGLE_MS = 1200;
   function playLevelJingle() {
     const ctx = ensureAudio();
     if (!ctx || muted) return;
     const now = ctx.currentTime;
-    // Bright ascending arpeggio: C5 → E5 → G5 → C6 (major)
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    const stepMs = 0.085;
-    notes.forEach((freq, i) => {
-      const t0 = now + i * stepMs;
+    // Arpeggio 1: C5 - E5 - G5
+    const arp1 = [523.25, 659.25, 783.99];
+    // Arpeggio 2 (higher, faster): G5 - C6 - E6 - G6
+    const arp2 = [783.99, 1046.50, 1318.51, 1567.98];
+    const step1 = 0.10, step2 = 0.075;
+    arp1.forEach((freq, i) => {
+      const t0 = now + i * step1;
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, t0);
       g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.18, t0 + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+      g.gain.linearRampToValueAtTime(0.20, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.26);
       osc.connect(g).connect(ctx.destination);
-      osc.start(t0); osc.stop(t0 + 0.26);
+      osc.start(t0); osc.stop(t0 + 0.3);
     });
-    // Final sparkle: high sine on top of the last note
-    const sparkleT = now + notes.length * stepMs;
-    const s = ctx.createOscillator();
-    const sg = ctx.createGain();
-    s.type = 'sine';
-    s.frequency.setValueAtTime(1568, sparkleT); // G6
-    sg.gain.setValueAtTime(0, sparkleT);
-    sg.gain.linearRampToValueAtTime(0.10, sparkleT + 0.02);
-    sg.gain.exponentialRampToValueAtTime(0.001, sparkleT + 0.45);
-    s.connect(sg).connect(ctx.destination);
-    s.start(sparkleT); s.stop(sparkleT + 0.5);
-  }
-  function playWinJingle() {
-    const ctx = ensureAudio();
-    if (!ctx || muted) return;
-    const now = ctx.currentTime;
-    // Longer fanfare: C5–E5–G5–C6 (fast) then hold on C6 with E6/G6 sparkle.
-    const fanfare = [523.25, 659.25, 783.99, 1046.50];
-    fanfare.forEach((freq, i) => {
-      const t0 = now + i * 0.10;
+    const arp2Start = now + arp1.length * step1 + 0.04;
+    arp2.forEach((freq, i) => {
+      const t0 = arp2Start + i * step2;
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = 'square';
       osc.frequency.setValueAtTime(freq, t0);
       g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.14, t0 + 0.015);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.20);
+      g.gain.linearRampToValueAtTime(0.13, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
       osc.connect(g).connect(ctx.destination);
-      osc.start(t0); osc.stop(t0 + 0.22);
+      osc.start(t0); osc.stop(t0 + 0.25);
     });
-    // Held triad: C6, E6, G6 ringing out together
-    const holdT = now + 0.42;
-    const triad = [1046.50, 1318.51, 1567.98];
-    triad.forEach((freq, i) => {
+    // Held triad on top — C6, E6, G6, ringing out
+    const holdT = arp2Start + arp2.length * step2 + 0.02;
+    [1046.50, 1318.51, 1567.98].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, holdT);
       g.gain.setValueAtTime(0, holdT);
-      g.gain.linearRampToValueAtTime(0.10 - i * 0.015, holdT + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.001, holdT + 0.9);
+      g.gain.linearRampToValueAtTime(0.11 - i * 0.018, holdT + 0.025);
+      g.gain.exponentialRampToValueAtTime(0.001, holdT + 0.55);
       osc.connect(g).connect(ctx.destination);
-      osc.start(holdT); osc.stop(holdT + 0.95);
+      osc.start(holdT); osc.stop(holdT + 0.6);
     });
-    // Sub thump for body
-    const sub = ctx.createOscillator();
+    // Sparkle: high sine on top during the hold
+    const s = ctx.createOscillator();
     const sg = ctx.createGain();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(130.81, now);
-    sub.frequency.exponentialRampToValueAtTime(65, now + 0.4);
-    sg.gain.setValueAtTime(0.18, now);
-    sg.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    sub.connect(sg).connect(ctx.destination);
-    sub.start(now); sub.stop(now + 0.55);
+    s.type = 'sine';
+    s.frequency.setValueAtTime(2093, holdT); // C7
+    sg.gain.setValueAtTime(0, holdT);
+    sg.gain.linearRampToValueAtTime(0.085, holdT + 0.03);
+    sg.gain.exponentialRampToValueAtTime(0.001, holdT + 0.7);
+    s.connect(sg).connect(ctx.destination);
+    s.start(holdT); s.stop(holdT + 0.75);
+  }
+  // Epic ~4-second win fanfare: rising arpeggio → triumphant melody → big held
+  // triad with sub-bass and sparkle on top. Played once when the player beats
+  // the final level.
+  function playWinJingle() {
+    const ctx = ensureAudio();
+    if (!ctx || muted) return;
+    const t0 = ctx.currentTime;
+    // Helper to schedule a note with attack/release envelope
+    function note(time, freq, dur, type, peak) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type || 'triangle';
+      osc.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(peak, time + 0.018);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(time); osc.stop(time + dur + 0.05);
+    }
+    // Section 1 (0.0 – 0.8s): Rising arpeggio sweep C5 → G6
+    const climb = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+    climb.forEach((f, i) => note(t0 + i * 0.12, f, 0.22, 'square', 0.14));
+    // Section 2 (0.8 – 2.0s): Triumphant melody, slower, in major key
+    //   G5  C6  E6  G6  E6  G6  (rhythm: q q q e e h)
+    const melody = [
+      [0.85, 783.99, 0.22],
+      [1.10, 1046.50, 0.22],
+      [1.35, 1318.51, 0.22],
+      [1.60, 1567.98, 0.16],
+      [1.78, 1318.51, 0.16],
+      [1.96, 1567.98, 0.40],
+    ];
+    melody.forEach(([dt, f, dur]) => note(t0 + dt, f, dur, 'triangle', 0.17));
+    // Section 3 (2.4 – 4.0s): Big sustained triad with shimmer & sub-bass
+    const holdT = t0 + 2.45;
+    [1046.50, 1318.51, 1567.98].forEach((f, i) => {
+      note(holdT, f, 1.6, 'triangle', 0.13 - i * 0.022);
+    });
+    // High shimmer (sine) on top of the hold
+    [2093.00, 2637.02].forEach((f, i) => {
+      note(holdT + 0.08, f, 1.3 - i * 0.2, 'sine', 0.075 - i * 0.02);
+    });
+    // Sub-bass thump at the start of the hold for impact
+    {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(130.81, holdT);
+      osc.frequency.exponentialRampToValueAtTime(65, holdT + 0.6);
+      g.gain.setValueAtTime(0.22, holdT);
+      g.gain.exponentialRampToValueAtTime(0.001, holdT + 0.75);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(holdT); osc.stop(holdT + 0.8);
+    }
+    // Initial impact thump at t=0 too — kicks off the fanfare
+    {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(98, t0);
+      osc.frequency.exponentialRampToValueAtTime(49, t0 + 0.35);
+      g.gain.setValueAtTime(0.20, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + 0.5);
+    }
+    // Final cymbal-ish swell at the very end — bandpass-filtered noise burst
+    {
+      const swellT = holdT + 0.05;
+      const dur = 1.5;
+      const bs = Math.floor(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bs; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bs);
+      const n = ctx.createBufferSource();
+      n.buffer = buf;
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'bandpass';
+      nf.frequency.value = 6500;
+      nf.Q.value = 0.5;
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0, swellT);
+      ng.gain.linearRampToValueAtTime(0.18, swellT + 0.15);
+      ng.gain.exponentialRampToValueAtTime(0.001, swellT + dur);
+      n.connect(nf).connect(ng).connect(ctx.destination);
+      n.start(swellT);
+    }
   }
   // Tiny, short blip used to "tick" alongside score-counter animation.
   // Frequency rises subtly with progress so a rapid counter feels like a slot
@@ -1591,11 +1679,16 @@
     }
   }
 
+  // Single source of truth for "normal" ball speed at the current level.
+  // Used by launchBall() AND by endAkhil() to renormalize after homing mode.
+  function normalBallSpeed() {
+    return 5.3 + (state.level - 1) * 0.55;
+  }
   function launchBall() {
     if (!state.ball.stuck) return;
     // Speed curve for 7 levels. Bumped ~20% to feel right at the 60-tick/sec
     // fixed sim rate (some devices were running RAF faster before).
-    const speed = 5.3 + (state.level - 1) * 0.55;
+    const speed = normalBallSpeed();
     const angle = (-Math.PI/2) + (Math.random()-0.5) * 0.6; // mostly up
     state.ball.vx = Math.cos(angle) * speed;
     state.ball.vy = Math.sin(angle) * speed;
@@ -1841,14 +1934,14 @@
     endgameOverlay.querySelectorAll('.firework').forEach(el => el.remove());
   }
   function spawnFireworks() {
-    const colors = ['#FF4D6A', '#FFD93D', '#5DD96A', '#5BD2FF', '#A569E5', '#FF6FA8'];
-    for (let i = 0; i < 14; i++) {
+    const colors = ['#FF4D6A', '#FFD93D', '#5DD96A', '#5BD2FF', '#A569E5', '#FF6FA8', '#FFA94D', '#7BFFCB'];
+    for (let i = 0; i < 22; i++) {
       const fw = document.createElement('div');
       fw.className = 'firework';
       fw.style.color = colors[i % colors.length];
-      fw.style.left = (8 + Math.random() * 84) + '%';
-      fw.style.top  = (8 + Math.random() * 70) + '%';
-      fw.style.animationDelay = (Math.random() * 1.4) + 's';
+      fw.style.left = (6 + Math.random() * 88) + '%';
+      fw.style.top  = (6 + Math.random() * 76) + '%';
+      fw.style.animationDelay = (Math.random() * 1.6) + 's';
       fw.style.animationDuration = (1.0 + Math.random() * 0.9) + 's';
       endgameOverlay.appendChild(fw);
     }
@@ -1872,16 +1965,20 @@
     completeNextBtn.classList.remove('ready');
     levelCompleteEl.classList.remove('hidden');
     // Animate counts in sequence: bricks → bonus → time → total.
+    // 25% slower than before, and we wait for the celebratory jingle to finish
+    // first so the chime doesn't fight the score-counter ticks.
     const total = bricksPts + levelBonus + timeBonus;
-    animateNumber(completeBricksEl, 0, bricksPts, 600, () => {
-      animateNumber(completeBonusEl, 0, levelBonus, 500, () => {
-        animateNumber(completeTimeEl, 0, timeBonus, 500, () => {
-          animateNumber(completeTotalEl, 0, total, 700, () => {
-            completeNextBtn.classList.add('ready');
+    setTimeout(() => {
+      animateNumber(completeBricksEl, 0, bricksPts, 750, () => {
+        animateNumber(completeBonusEl, 0, levelBonus, 625, () => {
+          animateNumber(completeTimeEl, 0, timeBonus, 625, () => {
+            animateNumber(completeTotalEl, 0, total, 875, () => {
+              completeNextBtn.classList.add('ready');
+            });
           });
         });
       });
-    });
+    }, LEVEL_JINGLE_MS);
   }
   function hideLevelComplete() {
     levelCompleteEl.classList.add('hidden');
@@ -1892,8 +1989,10 @@
   function animateNumber(el, from, to, duration, done) {
     const start = performance.now();
     // Skip ticks entirely for trivial counts so we don't spam audio for tiny values.
+    // Denser ticks (every ~55ms) so a slow rolling counter sounds like coins
+    // pouring out, not a few isolated bleeps.
     const range = Math.abs(to - from);
-    const TICK_COUNT = range < 5 ? 0 : Math.min(12, Math.max(4, Math.round(duration / 70)));
+    const TICK_COUNT = range < 5 ? 0 : Math.min(18, Math.max(5, Math.round(duration / 55)));
     let nextTickIdx = 0;
     function step(now) {
       const t = Math.min(1, (now - start) / duration);
@@ -2036,8 +2135,9 @@
     state.akhil.active = false;
     stopAkhilMusic();
     // Renormalize ball velocity to the current level's normal launch speed so
-    // the ball doesn't keep flying at AKHIL homing speed.
-    const normalSpeed = 4 + (state.level - 1) * 0.4;
+    // the ball doesn't keep flying at AKHIL homing speed. Uses the shared
+    // normalBallSpeed() helper so this stays in sync with launchBall().
+    const normalSpeed = normalBallSpeed();
     const mag = Math.hypot(state.ball.vx, state.ball.vy) || 1;
     state.ball.vx = (state.ball.vx / mag) * normalSpeed;
     state.ball.vy = (state.ball.vy / mag) * normalSpeed;
@@ -2301,11 +2401,25 @@
     const r = pauseBtnRect();
     return cx >= r.x && cx <= r.x + r.s && cy >= r.y && cy <= r.y + r.s;
   }
-  function canPause() {
+  // The button is drawn whenever the game is "active" (title dismissed, not in
+  // game-over / win / level-transition screens). It shows a TRIANGLE when:
+  //   (a) the game is paused, OR
+  //   (b) the ball is still stuck on the paddle — pause hasn't really started
+  //       yet, but we still want a visible play indicator.
+  // It only ACCEPTS a click when the ball is in flight (i.e. pause is meaningful).
+  function isPauseBtnVisible() {
     return gameStarted && !state.over && !state.won && !state.levelTransitioning;
   }
+  function canPause() {
+    // Pause only counts once a ball is actually in motion.
+    return isPauseBtnVisible() && !state.ball.stuck;
+  }
+  function shouldShowPlayIcon() {
+    // Play triangle if paused OR pre-launch (so user sees "we're about to start").
+    return state.paused || state.ball.stuck;
+  }
   function drawPauseButton() {
-    if (!canPause()) return;
+    if (!isPauseBtnVisible()) return;
     const r = pauseBtnRect();
     ctx.save();
     ctx.fillStyle = 'rgba(15, 22, 50, 0.78)';
@@ -2317,7 +2431,7 @@
     ctx.fillStyle = '#9ad7ff';
     ctx.shadowColor = 'rgba(91, 210, 255, 0.55)';
     ctx.shadowBlur = 8;
-    if (state.paused) {
+    if (shouldShowPlayIcon()) {
       // Play icon (triangle)
       ctx.beginPath();
       ctx.moveTo(r.x + 15, r.y + 11);
@@ -2347,11 +2461,14 @@
           || state.superKai.active || state.papa.active || state.akhil.active
           || state.over || state.won;
     }
-    if (e.key === '1' && !modeBlocked()) spawnFallingItem('superKai');
-    if (e.key === '2' && !modeBlocked()) spawnFallingItem('papa');
-    if (e.key === '3' && !modeBlocked()) spawnFallingItem('akhil');
-    if (e.key === '4' && !modeBlocked()) spawnFallingItem('bomb');
-    if (e.key === '5' && !modeBlocked()) spawnFallingItem('heart');
+    // Keyboard item spawn — also pulse the logo with the matching glow color
+    // so the feedback parity feels consistent with the touch tap path.
+    const KEY_TO_ITEM = { '1': 'superKai', '2': 'papa', '3': 'akhil', '4': 'bomb', '5': 'heart' };
+    const keyItem = KEY_TO_ITEM[e.key];
+    if (keyItem && !modeBlocked() && gameStarted) {
+      spawnFallingItem(keyItem);
+      pulseLogo(keyItem);
+    }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       if (!gameStarted) { dismissTitle(); return; }
@@ -2367,37 +2484,57 @@
     if (e.key === 'ArrowLeft')  state.keys.left  = false;
     if (e.key === 'ArrowRight') state.keys.right = false;
   });
-  // ---------- Logo tap → spawn an item (cheat / touch-testing) ----------
-  // Tap the Kai Breakout logo N times within ~800 ms of the last tap to spawn:
-  //   1 = SUPERKAI, 2 = PAPA, 3 = AKHIL, 4 = MAD MAMA, 5 = NOZOMI
-  // Each tap also pulses the logo so the player gets visual feedback while
-  // counting taps. The counter resets if you stop tapping (or after 5).
+  // ---------- Logo activation effects (touch + keyboard) ----------
+  // Mapping from item type → 1-tap index AND glow color (matches the in-game
+  // power-up halo so it feels "themed"):
+  //   1 tap  / key 1 = SUPERKAI → green
+  //   2 taps / key 2 = PAPA     → blue
+  //   3 taps / key 3 = AKHIL    → yellow
+  //   4 taps / key 4 = MAD MAMA → red
+  //   5 taps / key 5 = NOZOMI   → pink
+  const ITEM_BY_TAP = ['superKai', 'papa', 'akhil', 'bomb', 'heart'];
+  const ITEM_GLOW_COLOR = {
+    superKai: 'rgba(80, 240, 100, 0.95)',   // green
+    papa:     'rgba(120, 200, 255, 0.95)',  // blue
+    akhil:    'rgba(255, 220, 60, 0.95)',   // yellow
+    bomb:     'rgba(255, 70, 50, 0.95)',    // red (MAD MAMA)
+    heart:    'rgba(255, 100, 180, 0.95)',  // pink (NOZOMI)
+  };
+  const logoEl = document.getElementById('logo');
+  // Visual-only pulse used by BOTH input paths (touch taps + 1-5 keys).
+  function pulseLogo(itemType) {
+    if (!logoEl) return;
+    const color = ITEM_GLOW_COLOR[itemType] || 'rgba(91, 210, 255, 0.95)';
+    logoEl.style.setProperty('--pulse-color', color);
+    logoEl.classList.remove('tap-pulse');
+    // Force reflow so the class re-applies (otherwise back-to-back triggers don't pulse).
+    void logoEl.offsetWidth;
+    logoEl.classList.add('tap-pulse');
+    setTimeout(() => logoEl.classList.remove('tap-pulse'), 200);
+  }
+  // Touch users tap the logo to spawn an item. Mouse clicks DO NOT trigger
+  // spawning — mouse/keyboard users use keys 1-5 instead.
   (function setupLogoTapSpawn() {
-    const logoEl = document.getElementById('logo');
     if (!logoEl) return;
     let taps = 0;
     let resetTimer = null;
-    const ITEM_BY_TAP = ['superKai', 'papa', 'akhil', 'bomb', 'heart']; // index 0..4 = 1..5 taps
-    function fire() {
-      // Don't spawn during title or game-over/win/level-transition or while another mode is up.
-      if (!gameStarted) return;
-      if (state.fallingItem || state.nozomi.active || state.madMama.active
+    function modeBlocked() {
+      return !gameStarted
+          || state.fallingItem || state.nozomi.active || state.madMama.active
           || state.superKai.active || state.papa.active || state.akhil.active
-          || state.over || state.won || state.levelTransitioning) return;
+          || state.over || state.won || state.levelTransitioning;
+    }
+    function fire() {
+      if (modeBlocked()) return;
       const t = Math.min(taps, ITEM_BY_TAP.length);
       if (t >= 1) spawnFallingItem(ITEM_BY_TAP[t - 1]);
     }
-    function onTap(ev) {
-      // Stop default to avoid the touchstart-then-click double-fire on mobile.
+    function onTouchTap(ev) {
       ev.preventDefault();
       taps++;
-      // Pulse animation
-      logoEl.classList.remove('tap-pulse');
-      // Force reflow so the class re-applies (otherwise back-to-back taps don't pulse).
-      void logoEl.offsetWidth;
-      logoEl.classList.add('tap-pulse');
-      setTimeout(() => logoEl.classList.remove('tap-pulse'), 140);
-      // 5 taps = top tier — fire immediately.
+      // Glow color reflects what WILL spawn at the current tap count.
+      const previewType = ITEM_BY_TAP[Math.min(taps, ITEM_BY_TAP.length) - 1];
+      pulseLogo(previewType);
       if (taps >= 5) {
         fire();
         taps = 0;
@@ -2405,7 +2542,6 @@
         resetTimer = null;
         return;
       }
-      // Otherwise wait for the idle window to close, then fire whatever taps we got.
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => {
         fire();
@@ -2413,10 +2549,8 @@
         resetTimer = null;
       }, 800);
     }
-    logoEl.addEventListener('click', onTap);
-    // Touch: handle on touchstart for snappy feedback; also preventDefault to
-    // suppress the synthetic click that would otherwise double-count.
-    logoEl.addEventListener('touchstart', onTap, { passive: false });
+    // Touch-only: mouse clicks are intentionally ignored (per design).
+    logoEl.addEventListener('touchstart', onTouchTap, { passive: false });
   })();
   // Helper: convert mouse event to canvas-space coords (matches touch handler logic).
   function mousePosToCanvas(ev) {
@@ -2428,12 +2562,14 @@
   }
   canvas.addEventListener('click', ev => {
     if (!gameStarted) { dismissTitle(); return; }
-    // Pause button hit?
     const p = mousePosToCanvas(ev);
+    // Pause button: hit-test takes priority. Only togglable when pausing is legal.
     if (canPause() && isInPauseButton(p.x, p.y)) {
       setPaused(!state.paused);
       return;
     }
+    // If we're paused, clicking ANYWHERE on the canvas resumes the game.
+    if (state.paused) { setPaused(false); return; }
     if (state.ball.stuck) launchBall();
   });
 
@@ -2488,8 +2624,10 @@
     if (!gameStarted) { dismissTitle(); return; }
     if (state.levelTransitioning) { advanceToNextLevel(); return; }
     if (state.over || state.won) { restart(); return; }
+    // If paused, ANY tap on the canvas resumes the game.
+    if (state.paused) { setPaused(false); return; }
     if (state.ball.stuck) { launchBall(); return; }
-    // Pause is now triggered by the dedicated corner button — no canvas-tap pause.
+    // Pause is only triggered by the corner button now.
   }, { passive: false });
 
   function restart() {
@@ -2748,7 +2886,7 @@
           const tx = target.x + target.w/2, ty = target.y + target.h/2;
           const dx = tx - state.ball.x, dy = ty - state.ball.y;
           const d = Math.hypot(dx, dy) || 1;
-          const speed = 6.5;  // homing speed
+          const speed = 8.1;  // homing speed (+25% over original 6.5)
           state.ball.vx = (dx / d) * speed;
           state.ball.vy = (dy / d) * speed;
           state.ball.x += state.ball.vx;
@@ -2857,7 +2995,12 @@
 
         if (state.nozomi.active) {
           // Pass-through: clear non-steel bricks. Steel bricks survive.
-          damageBrick(b, { force: true });
+          // Still play the boing on each destroyed brick so it feels lively.
+          const destroyed = damageBrick(b, { force: true });
+          if (destroyed) {
+            state.funnyUntil = performance.now() + 200;
+            playFunnySound();
+          }
         } else if (state.madMama.active) {
           // EXPLOSION destroys everything in the blast radius, INCLUDING steel.
           spawnExplosion(b);
@@ -2935,7 +3078,11 @@
             e.y + R > b.y && e.y - R < b.y + b.h) {
           const prevX = e.x - e.vx;
           const prevY = e.y - e.vy;
-          damageBrick(b);
+          const destroyed = damageBrick(b);
+          if (destroyed) {
+            state.funnyUntil = performance.now() + 250;
+            playFunnySound();
+          }
           const hitFromSide = (prevX + R <= b.x) || (prevX - R >= b.x + b.w);
           const hitFromTop  = (prevY + R <= b.y) || (prevY - R >= b.y + b.h);
           if (hitFromSide) e.vx *= -1;
