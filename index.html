@@ -384,20 +384,18 @@
     line-height: 1.8;
   }
   /* Each half of the copyright is a nowrap span so neither breaks mid-phrase. */
-  .copyright-main { white-space: nowrap; display: inline-block; }
-  /* DEFAULT: always two-line layout. "© 2026 · A PAPA & KAI PRODUCTION" on
-     line 1, "ALL RIGHTS RESERVED" on line 2 with NO leading dot.
-     The only case where we want them on one line w/ a bullet between is the
-     landscape-phone media query below. */
-  .copyright-rights {
-    white-space: nowrap;
-    display: block;
-  }
-  .copyright-rights::before { content: ""; }
+  .copyright-main, .copyright-rights { white-space: nowrap; display: inline-block; }
+  /* DEFAULT (wide viewports): both halves render inline on one line, separated
+     by a bullet. The bullet uses TWO non-breaking spaces on each side so the
+     spacing matches the bullets inside copyright-main exactly. */
+  .copyright-rights::before { content: "\00a0\00a0·\00a0\00a0"; }
 
-  /* Narrow viewports: shrink the footer so the line-1 string doesn't get
-     clipped on the sides. */
-  @media (max-width: 700px) {
+  /* Narrow viewports (phone portrait): one line can't fit, so force the rights
+     half onto its own block — and DROP the leading bullet so line 2 starts
+     cleanly with "ALL RIGHTS RESERVED" instead of " · ALL RIGHTS...". */
+  @media (max-width: 720px) {
+    .copyright-rights         { display: block; }
+    .copyright-rights::before { content: ""; }
     .title-footer { font-size: 9px; letter-spacing: 1.4px; line-height: 1.7; bottom: 14px; }
   }
   @media (max-width: 400px) {
@@ -407,17 +405,15 @@
   /* ---------- PHONE LANDSCAPE (short viewports) ----------
      Bigger logo, push everything up, lock footer at bottom on a single line.
      padding-bottom on title-content guarantees the START button never crashes
-     into the absolutely-positioned footer. */
+     into the absolutely-positioned footer. Override the narrow-width rule to
+     keep both halves inline with the bullet. */
   @media (max-height: 480px) {
     #title-logo    { max-height: 70vh; max-width: 82vw; }
     .title-tagline { font-size: 10px; letter-spacing: 3px; }
     #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
     .title-content { gap: 4px; margin-top: -3vh; padding-bottom: 40px; }
-    /* Single-line override: collapse the two halves into one inline run with
-       a bullet between them. Spacing around the bullet matches the &nbsp;·&nbsp;
-       elsewhere in copyright-main (\00a0 is non-breaking space). */
     .copyright-rights         { display: inline-block; }
-    .copyright-rights::before { content: "\00a0·\00a0"; }
+    .copyright-rights::before { content: "\00a0\00a0·\00a0\00a0"; }
     .title-footer { font-size: 8px; letter-spacing: 1.2px; bottom: 6px; white-space: nowrap; line-height: 1; }
   }
 
@@ -503,6 +499,26 @@
   .endgame-row.new-high { border-color: rgba(255, 215, 100, 0.55); background: rgba(40, 30, 8, 0.45); }
   .endgame-row.new-high .endgame-label { color: #ffd76b; }
   .endgame-row.new-high .endgame-num { color: #ffe88a; text-shadow: 0 0 12px rgba(255, 220, 100, 0.95); }
+  /* Gold "NEW HIGH SCORE!" badge — shown below the endgame title (in win OR
+     lose state) when the player set a new high this run. Keeps the title's
+     own color/style (GAME OVER stays red, YOU WIN stays blue) and adds the
+     celebration as a separate line. */
+  #endgame-new-best {
+    font-family: "Press Start 2P", monospace;
+    font-size: 14px;
+    letter-spacing: 2.5px;
+    color: #ffe88a;
+    text-shadow:
+      0 0 14px rgba(255, 215, 100, 0.95),
+      0 0 28px rgba(255, 215, 100, 0.7);
+    margin: -10px 0 18px;
+    animation: new-best-pulse 1.0s ease-in-out infinite;
+  }
+  #endgame-new-best.hidden { display: none; }
+  @keyframes new-best-pulse {
+    0%, 100% { transform: scale(1);    text-shadow: 0 0 14px rgba(255, 215, 100, 0.95), 0 0 28px rgba(255, 215, 100, 0.7); }
+    50%      { transform: scale(1.06); text-shadow: 0 0 22px rgba(255, 215, 100, 1.0),  0 0 44px rgba(255, 215, 100, 0.85); }
+  }
   #endgame-button {
     font-family: "Press Start 2P", monospace;
     font-size: 14px;
@@ -630,11 +646,13 @@
   }
 
   /* ---------- High-score break flash ----------
-     Brief celebratory banner that flies in from the top when the player's
-     current score passes the stored high score for the first time this run. */
+     Brief celebratory banner that appears in the middle of the canvas (well
+     below the brick rows) when the player's current score first surpasses
+     the stored high score this run. Lower than the bricks so it's actually
+     readable. */
   #hiscore-flash {
     position: absolute;
-    top: 18%;
+    top: 55%;
     left: 50%;
     transform: translate(-50%, -50%) scale(0.6);
     z-index: 22;
@@ -652,7 +670,7 @@
   }
   #hiscore-flash.show { animation: hiscore-flash-anim 2.0s ease-out forwards; }
   @keyframes hiscore-flash-anim {
-    0%   { opacity: 0; transform: translate(-50%, -150%) scale(0.6); }
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
     20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
     35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00); }
     80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00); }
@@ -699,39 +717,39 @@
   .hiscore-reset-card {
     background: linear-gradient(180deg, rgba(40, 30, 8, 0.85), rgba(20, 14, 4, 0.92));
     border: 2px solid rgba(255, 215, 100, 0.65);
-    border-radius: 16px;
-    padding: 28px 36px;
+    border-radius: 20px;
+    padding: 38px 48px;
     text-align: center;
-    box-shadow: 0 0 40px rgba(255, 215, 100, 0.55);
-    max-width: 360px;
+    box-shadow: 0 0 52px rgba(255, 215, 100, 0.6);
+    max-width: 460px;
   }
   .hiscore-reset-card h2 {
     font-family: "Press Start 2P", monospace;
-    font-size: 18px;
-    letter-spacing: 2px;
+    font-size: 23px;
+    letter-spacing: 2.6px;
     color: #ffe88a;
-    margin: 0 0 14px;
-    text-shadow: 0 0 12px rgba(255, 215, 100, 0.85);
+    margin: 0 0 18px;
+    text-shadow: 0 0 14px rgba(255, 215, 100, 0.85);
   }
   .hiscore-reset-card p {
     font-family: "Press Start 2P", monospace;
-    font-size: 9px;
-    letter-spacing: 1.4px;
+    font-size: 12px;
+    letter-spacing: 1.8px;
     color: #c9b478;
-    margin: 0 0 20px;
+    margin: 0 0 26px;
     line-height: 1.7;
   }
   .hiscore-reset-buttons {
     display: flex;
-    gap: 12px;
+    gap: 16px;
     justify-content: center;
   }
   .hiscore-reset-buttons button {
     font-family: "Press Start 2P", monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 12px 18px;
-    border-radius: 8px;
+    font-size: 14px;
+    letter-spacing: 2.4px;
+    padding: 16px 24px;
+    border-radius: 10px;
     cursor: pointer;
     transition: transform 0.1s ease, box-shadow 0.2s ease;
   }
@@ -869,6 +887,7 @@
         <div class="endgame-card">
           <img id="endgame-face" src="kaiball silly.png" alt="" />
           <h1 id="endgame-title">GAME OVER</h1>
+          <div id="endgame-new-best" class="hidden">★ NEW HIGH SCORE! ★</div>
           <div class="endgame-stats">
             <div class="endgame-row"><span class="endgame-label">YOUR SCORE</span><span id="endgame-score" class="endgame-num">0</span></div>
             <div class="endgame-row"><span class="endgame-label">HI-SCORE</span><span id="endgame-high" class="endgame-num">0</span></div>
@@ -916,7 +935,7 @@
     <div class="title-tagline">BRICKS &nbsp;·&nbsp; BALLS &nbsp;·&nbsp; POWERUPS</div>
     <button id="title-start" type="button">START GAME</button>
   </div>
-  <div class="title-footer"><span class="copyright-main">© 2026 &nbsp;·&nbsp; A PAPA &amp; KAI PRODUCTION</span><wbr><span class="copyright-rights">ALL RIGHTS RESERVED</span></div>
+  <div class="title-footer"><span class="copyright-main">©&nbsp;2026&nbsp;&nbsp;·&nbsp;&nbsp;A&nbsp;PAPA&nbsp;&amp;&nbsp;KAI&nbsp;PRODUCTION</span><wbr><span class="copyright-rights">ALL&nbsp;RIGHTS&nbsp;RESERVED</span></div>
 </div>
 
 <script>
@@ -1505,12 +1524,12 @@
     osc.frequency.setValueAtTime(280, now);
     osc.frequency.exponentialRampToValueAtTime(140, now + 0.06);
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.10, now + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    g.gain.linearRampToValueAtTime(0.26, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
     osc.connect(g).connect(ctx.destination);
-    osc.start(now); osc.stop(now + 0.1);
-    // Very short noise transient — adds woody attack
-    const dur = 0.02;
+    osc.start(now); osc.stop(now + 0.11);
+    // Noise transient — adds woody attack so it punches above the music
+    const dur = 0.025;
     const bs = Math.floor(ctx.sampleRate * dur);
     const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
     const d = buf.getChannelData(0);
@@ -1519,9 +1538,9 @@
     n.buffer = buf;
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = 700;
+    f.frequency.value = 800;
     const ng = ctx.createGain();
-    ng.gain.setValueAtTime(0.07, now);
+    ng.gain.setValueAtTime(0.18, now);
     ng.gain.exponentialRampToValueAtTime(0.001, now + dur);
     n.connect(f).connect(ng).connect(ctx.destination);
     n.start(now);
@@ -2350,18 +2369,23 @@
 
   function showEndgame(kind) {
     const isWin = kind === 'win';
-    // Win → blue pulsing "CONGRATULATIONS, YOU WIN!", Lose → big red "GAME OVER"
+    // Title is fixed by win/lose state — DON'T overwrite for new-high.
+    // GAME OVER stays red; YOU WIN stays blue. New-high celebration goes
+    // into a dedicated gold badge below the title.
     endgameTitle.textContent = isWin ? 'CONGRATULATIONS!\nYOU WIN!' : 'GAME OVER';
     endgameTitle.style.whiteSpace = 'pre-line';
     endgameScore.textContent = state.score;
     endgameHigh.textContent  = highScore;
     endgameOverlay.classList.remove('win', 'lose');
     endgameOverlay.classList.add(isWin ? 'win' : 'lose');
-    if (state.score > prevHighScore) {
+    const newBestEl = document.getElementById('endgame-new-best');
+    const isNewHigh = state.score > prevHighScore && state.score > 0;
+    if (isNewHigh) {
       endgameHighRow.classList.add('new-high');
-      if (!isWin) endgameTitle.textContent = 'NEW HIGH SCORE!';
+      if (newBestEl) newBestEl.classList.remove('hidden');
     } else {
       endgameHighRow.classList.remove('new-high');
+      if (newBestEl) newBestEl.classList.add('hidden');
     }
     endgameFace.src = encodeURI(isWin ? 'kaiball silly.png' : 'kaiball.png');
     endgameButton.textContent = 'PLAY AGAIN';
@@ -2598,6 +2622,7 @@
     state.akhil.rotation = 0;
     state.akhil.target = null;
     state.akhil.bounceTicks = 0;
+    state.akhil.posHistory = null;   // fresh stagnation tracker
     if (state.ball.stuck) launchBall();
     playPowerSound();
     flashCanvas('akhil');
@@ -3500,17 +3525,88 @@
         state.akhil.bounceTicks--;
         if (state.akhil.bounceTicks === 0) state.akhil.target = null;
       } else {
-        // Find / re-acquire nearest target (non-steel brick).
-        if (!state.akhil.target || !state.akhil.target.alive || state.akhil.target.kind === 'steel') {
-          let nearest = null, nearestD = Infinity;
+        // Line-segment vs axis-aligned-rectangle test (slab method). Used to
+        // detect when a steel brick sits between the ball and a candidate
+        // target — if it does, we'd rather pick a different target than fight
+        // the steering forces forever.
+        function lineHitsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
+          const dx = x2 - x1, dy = y2 - y1;
+          let tmin = 0, tmax = 1;
+          if (Math.abs(dx) < 1e-6) {
+            if (x1 < rx || x1 > rx + rw) return false;
+          } else {
+            let t1 = (rx - x1) / dx;
+            let t2 = (rx + rw - x1) / dx;
+            if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+            tmin = Math.max(tmin, t1);
+            tmax = Math.min(tmax, t2);
+            if (tmin > tmax) return false;
+          }
+          if (Math.abs(dy) < 1e-6) {
+            if (y1 < ry || y1 > ry + rh) return false;
+          } else {
+            let t1 = (ry - y1) / dy;
+            let t2 = (ry + rh - y1) / dy;
+            if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+            tmin = Math.max(tmin, t1);
+            tmax = Math.min(tmax, t2);
+            if (tmin > tmax) return false;
+          }
+          return true;
+        }
+        function lineOfSightClear(toX, toY) {
+          for (const sb of state.bricks) {
+            if (!sb.alive || sb.kind !== 'steel') continue;
+            if (lineHitsRect(state.ball.x, state.ball.y, toX, toY,
+                             sb.x, sb.y, sb.w, sb.h)) return false;
+          }
+          return true;
+        }
+        function pickTarget() {
+          // Two-pass: prefer a brick with a clear line of sight; fall back to
+          // the nearest non-steel brick (the ball will steer around).
+          let bestClear = null, bestClearD = Infinity;
+          let bestAny   = null, bestAnyD   = Infinity;
           for (const b of state.bricks) {
             if (!b.alive || b.kind === 'steel') continue;
-            const dx = (b.x + b.w/2) - state.ball.x;
-            const dy = (b.y + b.h/2) - state.ball.y;
-            const d = dx*dx + dy*dy;
-            if (d < nearestD) { nearestD = d; nearest = b; }
+            const cx = b.x + b.w/2, cy = b.y + b.h/2;
+            const dx = cx - state.ball.x, dy = cy - state.ball.y;
+            const d  = dx*dx + dy*dy;
+            if (d < bestAnyD) { bestAnyD = d; bestAny = b; }
+            if (d < bestClearD && lineOfSightClear(cx, cy)) {
+              bestClearD = d; bestClear = b;
+            }
           }
-          state.akhil.target = nearest;
+          return bestClear || bestAny;
+        }
+        // Re-acquire target when current is dead, gone, or steel (defensive).
+        if (!state.akhil.target || !state.akhil.target.alive || state.akhil.target.kind === 'steel') {
+          state.akhil.target = pickTarget();
+          state.akhil.posHistory = null;  // reset stagnation tracker
+        }
+        // ---- Stagnation watchdog ----
+        // If the ball hasn't moved ≥50 px in the last 28 ticks, the steering
+        // is stuck (oscillating near steel, target trapped behind a wall,
+        // etc). Force re-pick + a tiny random nudge to break the symmetry.
+        if (!state.akhil.posHistory) state.akhil.posHistory = [];
+        state.akhil.posHistory.push(state.ball.x, state.ball.y);
+        if (state.akhil.posHistory.length > 56) state.akhil.posHistory.splice(0, 2);
+        if (state.akhil.posHistory.length === 56) {
+          const x0 = state.akhil.posHistory[0], y0 = state.akhil.posHistory[1];
+          const xN = state.akhil.posHistory[54], yN = state.akhil.posHistory[55];
+          const traveled = Math.hypot(xN - x0, yN - y0);
+          if (traveled < 50) {
+            // Pick a fresh target — preferring a NEW one if available.
+            const prevTarget = state.akhil.target;
+            state.akhil.target = pickTarget();
+            // If we're stuck on the same target, nudge ball away from current
+            // steel cluster to escape the pocket.
+            if (state.akhil.target === prevTarget) {
+              state.ball.x += (Math.random() - 0.5) * 8;
+              state.ball.y += (Math.random() - 0.5) * 8;
+            }
+            state.akhil.posHistory = [];
+          }
         }
         const target = state.akhil.target;
         if (target) {
