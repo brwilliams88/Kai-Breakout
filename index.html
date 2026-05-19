@@ -384,17 +384,20 @@
     line-height: 1.8;
   }
   /* Each half of the copyright is a nowrap span so neither breaks mid-phrase. */
-  .copyright-main, .copyright-rights { white-space: nowrap; display: inline-block; }
-  /* Default (wide viewports): both halves inline, bullet between them. */
-  .copyright-rights::before { content: " · "; }
+  .copyright-main { white-space: nowrap; display: inline-block; }
+  /* DEFAULT: always two-line layout. "© 2026 · A PAPA & KAI PRODUCTION" on
+     line 1, "ALL RIGHTS RESERVED" on line 2 with NO leading dot.
+     The only case where we want them on one line w/ a bullet between is the
+     landscape-phone media query below. */
+  .copyright-rights {
+    white-space: nowrap;
+    display: block;
+  }
+  .copyright-rights::before { content: ""; }
 
-  /* ---------- PHONE PORTRAIT (and other narrow viewports) ----------
-     Force the copyright onto two lines: line 1 = © 2026 · A PAPA & KAI
-     PRODUCTION, line 2 = ALL RIGHTS RESERVED (no leading bullet). Smaller
-     font so it never gets clipped at the side. */
+  /* Narrow viewports: shrink the footer so the line-1 string doesn't get
+     clipped on the sides. */
   @media (max-width: 700px) {
-    .copyright-rights         { display: block; }
-    .copyright-rights::before { content: ""; }
     .title-footer { font-size: 9px; letter-spacing: 1.4px; line-height: 1.7; bottom: 14px; }
   }
   @media (max-width: 400px) {
@@ -410,9 +413,11 @@
     .title-tagline { font-size: 10px; letter-spacing: 3px; }
     #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
     .title-content { gap: 4px; margin-top: -3vh; padding-bottom: 40px; }
-    /* Override the portrait two-line layout: in landscape we keep it inline. */
+    /* Single-line override: collapse the two halves into one inline run with
+       a bullet between them. Spacing around the bullet matches the &nbsp;·&nbsp;
+       elsewhere in copyright-main (\00a0 is non-breaking space). */
     .copyright-rights         { display: inline-block; }
-    .copyright-rights::before { content: " · "; }
+    .copyright-rights::before { content: "\00a0·\00a0"; }
     .title-footer { font-size: 8px; letter-spacing: 1.2px; bottom: 6px; white-space: nowrap; line-height: 1; }
   }
 
@@ -588,6 +593,163 @@
   }
   #endgame-overlay.win .firework { animation: firework-burst 1.8s ease-out infinite; opacity: 1; }
 
+  /* ---------- Per-level intro card ----------
+     Fades in for ~300ms, holds for ~700ms, fades out for ~300ms. While it's up,
+     the new level's bricks are drawn underneath but gameplay is frozen via
+     state.levelTransitioning. */
+  #level-intro {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 18;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(8, 16, 36, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
+  }
+  #level-intro.show { animation: level-intro-anim 1.3s ease-out forwards; }
+  #level-intro .level-intro-text {
+    font-family: "Press Start 2P", monospace;
+    color: #b6efff;
+    font-size: 56px;
+    letter-spacing: 8px;
+    text-shadow:
+      0 0 16px rgba(91, 210, 255, 0.95),
+      0 0 36px rgba(91, 210, 255, 0.7),
+      0 0 64px rgba(91, 210, 255, 0.45);
+    transform: scale(0.85);
+    transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+  #level-intro.show .level-intro-text { transform: scale(1.06); }
+  @keyframes level-intro-anim {
+    0%   { opacity: 0; }
+    20%  { opacity: 1; }
+    78%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ---------- High-score break flash ----------
+     Brief celebratory banner that flies in from the top when the player's
+     current score passes the stored high score for the first time this run. */
+  #hiscore-flash {
+    position: absolute;
+    top: 18%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.6);
+    z-index: 22;
+    pointer-events: none;
+    opacity: 0;
+    font-family: "Press Start 2P", monospace;
+    color: #ffe88a;
+    font-size: 30px;
+    letter-spacing: 4px;
+    white-space: nowrap;
+    text-shadow:
+      0 0 14px rgba(255, 220, 100, 0.95),
+      0 0 30px rgba(255, 200, 60, 0.8),
+      0 0 60px rgba(255, 160, 40, 0.55);
+  }
+  #hiscore-flash.show { animation: hiscore-flash-anim 2.0s ease-out forwards; }
+  @keyframes hiscore-flash-anim {
+    0%   { opacity: 0; transform: translate(-50%, -150%) scale(0.6); }
+    20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00); }
+    80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  }
+  /* Highlight the HI-SCORE stat box at the same time for a few seconds. */
+  .stat-high.flashing {
+    animation: hiscore-stat-pulse 2.0s ease-in-out;
+  }
+  @keyframes hiscore-stat-pulse {
+    0%, 100% { box-shadow: none; }
+    50%      { box-shadow: 0 0 24px rgba(255, 215, 100, 0.95), inset 0 0 14px rgba(255, 215, 100, 0.45); }
+  }
+  /* Long-press-to-reset feedback: the HI-SCORE box gradually intensifies a
+     gold pulse over 5 seconds. Release before the timer fires → reverts. */
+  .stat-high {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .stat-high.holding {
+    animation: hiscore-hold-pulse 0.45s ease-in-out infinite alternate;
+    transform: scale(1.04);
+    transition: transform 0.3s ease-out;
+  }
+  @keyframes hiscore-hold-pulse {
+    from { box-shadow: 0 0 10px rgba(255, 215, 100, 0.55), inset 0 0 8px rgba(255, 215, 100, 0.25); }
+    to   { box-shadow: 0 0 28px rgba(255, 215, 100, 1.0),  inset 0 0 16px rgba(255, 215, 100, 0.55); }
+  }
+
+  /* ---------- Reset-high-score confirmation modal ---------- */
+  #hiscore-reset-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 22, 0.78);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.2s ease;
+  }
+  #hiscore-reset-modal.hidden { opacity: 0; pointer-events: none; }
+  .hiscore-reset-card {
+    background: linear-gradient(180deg, rgba(40, 30, 8, 0.85), rgba(20, 14, 4, 0.92));
+    border: 2px solid rgba(255, 215, 100, 0.65);
+    border-radius: 16px;
+    padding: 28px 36px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(255, 215, 100, 0.55);
+    max-width: 360px;
+  }
+  .hiscore-reset-card h2 {
+    font-family: "Press Start 2P", monospace;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: #ffe88a;
+    margin: 0 0 14px;
+    text-shadow: 0 0 12px rgba(255, 215, 100, 0.85);
+  }
+  .hiscore-reset-card p {
+    font-family: "Press Start 2P", monospace;
+    font-size: 9px;
+    letter-spacing: 1.4px;
+    color: #c9b478;
+    margin: 0 0 20px;
+    line-height: 1.7;
+  }
+  .hiscore-reset-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .hiscore-reset-buttons button {
+    font-family: "Press Start 2P", monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 12px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+  }
+  #hiscore-reset-confirm {
+    color: #021428;
+    background: linear-gradient(180deg, #ffe88a, #ffc844 45%, #d99320);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 18px rgba(255, 215, 100, 0.65);
+  }
+  #hiscore-reset-cancel {
+    color: #d6dffd;
+    background: rgba(60, 80, 130, 0.45);
+    border: 2px solid rgba(120, 160, 220, 0.6);
+  }
+  #hiscore-reset-confirm:hover { transform: translateY(-2px); box-shadow: 0 4px 24px rgba(255, 215, 100, 0.9); }
+  #hiscore-reset-cancel:hover  { transform: translateY(-2px); background: rgba(80, 110, 170, 0.55); }
+  #hiscore-reset-confirm:active, #hiscore-reset-cancel:active { transform: translateY(0); }
+
   /* Level complete popup */
   #level-complete {
     position: absolute;
@@ -718,12 +880,24 @@
         <div class="complete-card">
           <h1 id="complete-title">LEVEL 1 COMPLETE!</h1>
           <div class="complete-rows">
-            <div class="complete-row"><span class="label">BRICKS</span><span class="value" id="complete-bricks">0</span></div>
+            <div class="complete-row"><span class="label">BRICKS SCORE</span><span class="value" id="complete-bricks">0</span></div>
             <div class="complete-row"><span class="label">LEVEL BONUS</span><span class="value" id="complete-bonus">0</span></div>
             <div class="complete-row"><span class="label">TIME BONUS</span><span class="value" id="complete-time">0</span></div>
             <div class="complete-row total"><span class="label">TOTAL</span><span class="value" id="complete-total">0</span></div>
           </div>
           <button id="complete-next">NEXT LEVEL</button>
+        </div>
+      </div>
+      <div id="level-intro" aria-hidden="true"><div class="level-intro-text">LEVEL 2</div></div>
+      <div id="hiscore-flash" aria-hidden="true">NEW HIGH SCORE!</div>
+      <div id="hiscore-reset-modal" class="hidden">
+        <div class="hiscore-reset-card">
+          <h2>RESET HIGH SCORE?</h2>
+          <p>This will erase your saved best.</p>
+          <div class="hiscore-reset-buttons">
+            <button id="hiscore-reset-confirm">YES, RESET</button>
+            <button id="hiscore-reset-cancel">CANCEL</button>
+          </div>
         </div>
       </div>
     </div>
@@ -875,6 +1049,25 @@
     });
   }
   let scoreBumpTimer = 0;
+  let brokeHighScoreThisRun = false;  // reset on restart()
+  function showHighScoreFlash() {
+    const flashEl = document.getElementById('hiscore-flash');
+    if (flashEl) {
+      flashEl.classList.remove('show');
+      void flashEl.offsetWidth;
+      flashEl.classList.add('show');
+      setTimeout(() => flashEl.classList.remove('show'), 2050);
+    }
+    const statEl = document.querySelector('.stat-high');
+    if (statEl) {
+      statEl.classList.remove('flashing');
+      void statEl.offsetWidth;
+      statEl.classList.add('flashing');
+      setTimeout(() => statEl.classList.remove('flashing'), 2050);
+    }
+    // Small celebratory blip (reuse the dah-ding chime — short, joyful).
+    if (typeof playItemSelectChime === 'function') playItemSelectChime();
+  }
   function setScore(s) {
     scoreEl.textContent = s;
     // Pop animation when score changes
@@ -888,7 +1081,99 @@
       highEl.textContent = highScore;
       try { localStorage.setItem('kaiHighScore', String(highScore)); } catch (_) {}
     }
+    // High-score break flash: only when we cross the PREVIOUS high score (the
+    // one we walked in with) for the first time in this run. prevHighScore is
+    // pinned at run start, so as long as that baseline isn't 0 we celebrate.
+    if (!brokeHighScoreThisRun && typeof prevHighScore !== 'undefined'
+        && prevHighScore > 0 && s > prevHighScore) {
+      brokeHighScoreThisRun = true;
+      showHighScoreFlash();
+    }
   }
+
+  // ---------- Long-press to reset high score ----------
+  // Hold the HI-SCORE box for 5 seconds → confirmation modal → confirm wipes
+  // the saved value. Only works when the game isn't actively being played:
+  // - title not yet dismissed
+  // - paused
+  // - ball still on paddle (any level, including between levels)
+  // - game-over / win / level-transition screens up
+  (function setupHighScoreReset() {
+    const statHigh = document.querySelector('.stat-high');
+    if (!statHigh) return;
+    const modal = document.getElementById('hiscore-reset-modal');
+    const confirmBtn = document.getElementById('hiscore-reset-confirm');
+    const cancelBtn  = document.getElementById('hiscore-reset-cancel');
+    let holdTimer = null;
+    function gameIsActivelyPlaying() {
+      // The single negation of "can reset right now". If ANY of these is true,
+      // the user is between actions and the reset is allowed.
+      try {
+        if (!gameStarted)                return false;
+        if (state.paused)                return false;
+        if (state.over || state.won)     return false;
+        if (state.levelTransitioning)    return false;
+        if (state.ball.stuck)            return false;
+        return true;
+      } catch (_) {
+        // If state isn't ready yet (very early), behave as "not playing".
+        return false;
+      }
+    }
+    function canResetHighScore() { return !gameIsActivelyPlaying(); }
+    function startHold(ev) {
+      if (!canResetHighScore()) return;
+      if (holdTimer) return;
+      // Suppress default to prevent text selection / synthetic mouse events.
+      if (ev && ev.cancelable) ev.preventDefault();
+      statHigh.classList.add('holding');
+      holdTimer = setTimeout(() => {
+        statHigh.classList.remove('holding');
+        holdTimer = null;
+        if (modal) modal.classList.remove('hidden');
+      }, 5000);
+    }
+    function cancelHold() {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      statHigh.classList.remove('holding');
+    }
+    // Mouse
+    statHigh.addEventListener('mousedown',  startHold);
+    statHigh.addEventListener('mouseup',    cancelHold);
+    statHigh.addEventListener('mouseleave', cancelHold);
+    // Touch
+    statHigh.addEventListener('touchstart', startHold, { passive: false });
+    statHigh.addEventListener('touchend',   cancelHold);
+    statHigh.addEventListener('touchcancel',cancelHold);
+    // Modal buttons
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        highScore = 0;
+        try { localStorage.removeItem('kaiHighScore'); } catch (_) {}
+        if (highEl) highEl.textContent = '0';
+        prevHighScore = 0;
+        brokeHighScoreThisRun = false;
+        if (modal) modal.classList.add('hidden');
+      });
+    }
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        if (modal) modal.classList.add('hidden');
+      });
+    }
+    // Click backdrop to cancel
+    if (modal) {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+    }
+    // Esc to cancel
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+        modal.classList.add('hidden');
+      }
+    });
+  })();
 
   // ---------- Sound (procedural, no external files) ----------
   let audioCtx = null;
@@ -1202,6 +1487,43 @@
     ng.gain.setValueAtTime(0.65, now);
     ng.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
     n.connect(nf).connect(ng).connect(ctx.destination);
+    n.start(now);
+  }
+
+  // ---------- Paddle bounce SFX ----------
+  // Subtle "thock" on every paddle hit — adds tactile feedback so the bounce
+  // doesn't feel silent. Volume is very low so it doesn't compete with the
+  // brick-destroy boing.
+  function playPaddleHit() {
+    const ctx = ensureAudio();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    // Body: short sine drop — sounds like a soft "tock"
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(280, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.06);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.10, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(now); osc.stop(now + 0.1);
+    // Very short noise transient — adds woody attack
+    const dur = 0.02;
+    const bs = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bs);
+    const n = ctx.createBufferSource();
+    n.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 700;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.07, now);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    n.connect(f).connect(ng).connect(ctx.destination);
     n.start(now);
   }
 
@@ -2139,12 +2461,29 @@
     requestAnimationFrame(step);
   }
 
+  // Per-level intro card — fades in/out between the level-complete popup and
+  // the start of the next level. Pure decoration; keeps levelTransitioning
+  // true so the ball / paddle stay frozen during the ~1.3 s display.
+  const levelIntroEl = document.getElementById('level-intro');
+  function showLevelIntro(levelNum, onDone) {
+    if (!levelIntroEl) { if (onDone) onDone(); return; }
+    const t = levelIntroEl.querySelector('.level-intro-text');
+    if (t) t.textContent = 'LEVEL ' + levelNum;
+    levelIntroEl.classList.remove('show');
+    void levelIntroEl.offsetWidth;  // force reflow so the animation re-runs
+    levelIntroEl.classList.add('show');
+    setTimeout(() => {
+      levelIntroEl.classList.remove('show');
+      if (onDone) onDone();
+    }, 1300);
+  }
   function advanceToNextLevel() {
     if (levelCompleteEl.classList.contains('hidden')) return;
     if (!completeNextBtn.classList.contains('ready')) return;  // wait for animation
     hideLevelComplete();
     // Defensive: fully reset transient state before building the next level.
-    state.levelTransitioning = false;
+    // Keep levelTransitioning = true through the intro so input stays frozen.
+    state.levelTransitioning = true;
     state.fallingItem = null;
     state.extras.length = 0;
     state.particles.length = 0;
@@ -2158,10 +2497,14 @@
     state.akhil.bounceTicks = 0;
     state.akhil.rotation = 0;
     state.nozomi.paddlePerim = 0;
-    // Center the paddle (might have been off during a PAPA mode that ended).
     state.paddleX = W/2 - paddleW()/2;
-    // Reset ball to paddle. Player must press space/click to launch.
-    startLevel(state.level + 1);
+    // Build the next level under the intro overlay (bricks visible underneath).
+    const nextLevel = state.level + 1;
+    startLevel(nextLevel);
+    // After the intro animation completes, finally release the freeze.
+    showLevelIntro(nextLevel, () => {
+      state.levelTransitioning = false;
+    });
   }
   completeNextBtn.addEventListener('click', advanceToNextLevel);
 
@@ -2492,6 +2835,29 @@
                                              'rgba(255, 255, 255, 0.25)';
   }
 
+  // ---------- Screen shake (used by MAD MAMA explosions) ----------
+  // Per-frame random offset applied to the rendering transform. Decays linearly
+  // so the screen settles within ~200-300ms. Gated behind prefers-reduced-motion
+  // for users sensitive to camera shake.
+  let shakeRemaining = 0;       // frames remaining
+  let shakePeakMagnitude = 0;   // px at peak (start of shake)
+  let shakeTotalFrames = 1;     // for decay calc
+  const REDUCED_MOTION = (() => {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (_) { return false; }
+  })();
+  function triggerShake(magnitude, durationFrames) {
+    if (REDUCED_MOTION) return;
+    // Stronger / longer shake wins so chained explosions stack.
+    if (magnitude > shakePeakMagnitude) {
+      shakePeakMagnitude = magnitude;
+      shakeTotalFrames   = durationFrames;
+      shakeRemaining     = durationFrames;
+    } else if (durationFrames > shakeRemaining) {
+      shakeRemaining = durationFrames;
+    }
+  }
+
   // ---------- Perimeter math for snake paddle ----------
   function perimToXY(t) {
     const w = W - 2 * PERIM_INSET;
@@ -2749,22 +3115,14 @@
   });
 
   // ---------- Touch controls (mobile / iPad) ----------
-  // Touches anywhere in the control zone (canvas + below) steer the paddle.
-  // The drag continues even if the finger leaves the zone (we track the touch
-  // identifier from start).
-  //   • Tap (no movement) outside the pause button:
-  //       - title not dismissed → dismiss
-  //       - end-of-level popup → advance
-  //       - game over / win → restart
-  //       - paused → resume (anywhere in canvas)
-  //       - ball stuck → launch
+  // Multi-touch safe: track the paddle drag by the originating touch identifier
+  // so that secondary touches (e.g. tapping the side logo to spawn an item)
+  // don't disturb the ongoing drag. Each touchmove/touchend looks up the
+  // matching touch in changedTouches by id.
   state.touchTargetX = null;
+  let paddleTouchId = null;          // identifier of the finger currently steering
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
   let touchOnPauseBtn = false;
-  // True while the player is actively dragging the paddle. Set on touchstart
-  // (if the start is inside the control zone and not on the logo / pause btn /
-  // some other interactive child) and cleared on touchend.
-  let touchDragging = false;
   function touchPosToCanvas(touch) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -2776,59 +3134,75 @@
   // or other interactive HTML controls.
   function touchOnInteractiveChild(target) {
     if (!target || target === canvas || target === document.body) return false;
-    return target.closest && target.closest('#logo, #title-screen, #endgame-overlay, #level-complete, button');
+    return target.closest && target.closest('#logo, #title-screen, #endgame-overlay, #level-complete, #hiscore-reset-modal, button');
+  }
+  function findTouchById(touchList, id) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].identifier === id) return touchList[i];
+    }
+    return null;
   }
   document.addEventListener('touchstart', e => {
-    const t = e.touches[0];
-    if (!t) return;
-    if (touchOnInteractiveChild(e.target)) return;  // let logo / buttons handle it
-    const inZone = pointerInControlZone(t.clientX, t.clientY);
-    // Only act if the touch starts inside the canvas itself OR the extended
-    // zone (below canvas, within X range). Above the canvas — no effect.
-    if (!inZone) return;
-    e.preventDefault();
-    touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
-    touchDragging = true;
-    // If the tap lands inside the pause button area (only meaningful when
-    // touch is ON the canvas, not below), treat it as a button press.
-    touchOnPauseBtn = inZone.onCanvas && canPause() && isInPauseButton(inZone.x, inZone.y);
-    if (!touchOnPauseBtn && paddleControlActive()) {
-      state.touchTargetX = inZone.x - paddleW()/2;
+    // Process each NEW touch (changedTouches). If we already have a paddle
+    // touch active, ignore additional ones — they're free to interact with
+    // sidebar elements without affecting the drag.
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      // Skip touches that land on UI elements with their own handlers.
+      if (touchOnInteractiveChild(t.target)) continue;
+      const inZone = pointerInControlZone(t.clientX, t.clientY);
+      if (!inZone) continue;
+      if (paddleTouchId !== null) continue;   // already tracking a finger
+      e.preventDefault();
+      paddleTouchId = t.identifier;
+      touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
+      touchOnPauseBtn = inZone.onCanvas && canPause() && isInPauseButton(inZone.x, inZone.y);
+      if (!touchOnPauseBtn && paddleControlActive()) {
+        state.touchTargetX = inZone.x - paddleW()/2;
+      }
+      break;
     }
   }, { passive: false });
   document.addEventListener('touchmove', e => {
-    if (!touchDragging) return;
-    const t = e.touches[0];
+    if (paddleTouchId === null) return;
+    const t = findTouchById(e.changedTouches, paddleTouchId);
     if (!t) return;
     e.preventDefault();
     if (Math.abs(t.clientX - touchStartX) > 8 || Math.abs(t.clientY - touchStartY) > 8) touchMoved = true;
-    if (touchOnPauseBtn) return;  // pause-button press — don't move paddle while finger drags
+    if (touchOnPauseBtn) return;
     if (!paddleControlActive()) return;
-    // Convert to canvas-X even if the finger has drifted outside the zone;
-    // we clamp to [0, W - paddleW] downstream so it just rests at the edge.
     const rect = canvas.getBoundingClientRect();
     const cx = (t.clientX - rect.left) * (W / rect.width);
     state.touchTargetX = cx - paddleW()/2;
   }, { passive: false });
-  document.addEventListener('touchend', e => {
-    if (!touchDragging) return;
-    touchDragging = false;
-    e.preventDefault();
-    state.touchTargetX = null;  // stop sliding paddle
-    // Pause-button tap: release within button, no significant drag → toggle pause.
+  function endPaddleTouch(touchMovedFlag) {
+    paddleTouchId = null;
+    state.touchTargetX = null;
     if (touchOnPauseBtn) {
       touchOnPauseBtn = false;
-      if (!touchMoved) { setPaused(!state.paused); return; }
+      if (!touchMovedFlag) setPaused(!state.paused);
       return;
     }
-    if (touchMoved) return;
-    // Tap (not drag). Decide what to do based on game state.
+    if (touchMovedFlag) return;
+    // Tap (not drag).
     if (!gameStarted) { dismissTitle(); return; }
     if (state.levelTransitioning) { advanceToNextLevel(); return; }
     if (state.over || state.won) { restart(); return; }
-    // If paused, ANY tap inside the zone resumes the game.
     if (state.paused) { setPaused(false); return; }
     if (state.ball.stuck) { launchBall(); return; }
+  }
+  document.addEventListener('touchend', e => {
+    if (paddleTouchId === null) return;
+    const t = findTouchById(e.changedTouches, paddleTouchId);
+    if (!t) return;       // a different finger lifted; ignore
+    e.preventDefault();
+    endPaddleTouch(touchMoved);
+  }, { passive: false });
+  document.addEventListener('touchcancel', e => {
+    if (paddleTouchId === null) return;
+    const t = findTouchById(e.changedTouches, paddleTouchId);
+    if (!t) return;
+    endPaddleTouch(true);   // treat cancel as drag end, not tap
   }, { passive: false });
 
   function restart() {
@@ -2858,6 +3232,7 @@
     state.levelTransitioning = false;
     state.levelBrickPoints = 0;
     prevHighScore = highScore;
+    brokeHighScoreThisRun = false;
     hideLevelComplete();
     hideEndgame();
     startLevel(1);
@@ -2908,13 +3283,18 @@
     if (opts.useExplosion) spawnExplosion(b);
     else                   spawnBrickParticles(b);
     spawnScorePopup(b, points);
-    // Milestone combo banners
+    // Combo threshold callout — fires ONCE when the multiplier first crosses
+    // x2 (combo 3) and once more when it crosses x3 (combo 10). Never per-brick,
+    // so chain reactions don't fill the screen with text.
     if (state.combo === 3 || state.combo === 10) {
       state.popups.push({
-        x: b.x + b.w/2, y: b.y - 14,
-        text: (mult) + 'x COMBO!',
+        kind: 'combo',
+        x: b.x + b.w/2,
+        // Anchor a bit above the brick — keeps it readable through the chain.
+        y: Math.max(60, b.y - 28),
+        text: 'x' + mult + ' COMBO!',
         color: state.combo === 10 ? '#ff6fa8' : '#ffd76b',
-        life: 70, maxLife: 70
+        life: 95, maxLife: 95
       });
     }
     return true;
@@ -2939,6 +3319,11 @@
   function update(dt) {
     if (!gameStarted || state.paused || state.over || state.won || state.levelTransitioning) return;
     state.activeTicks++;
+    // Freeze the item-spawn timer while the ball is sitting on the paddle
+    // awaiting launch. We do this by bumping nextSpawnTick in lock-step with
+    // activeTicks — net effect: the 60 s spawn clock only counts down during
+    // active play (paused is already handled by the early-return above).
+    if (state.ball.stuck) state.nextSpawnTick++;
     if (canvasFlash > 0) canvasFlash--;
 
     // --- Particles ---
@@ -3051,13 +3436,20 @@
       const kspeed = 9;
       if (state.keys.left)  state.paddleX -= kspeed;
       if (state.keys.right) state.paddleX += kspeed;
-      // Touch input: slide toward the finger's target at a steady speed (no teleport)
+      // Touch input: slide toward the finger's target. Speed SCALES with the
+      // remaining distance so a far-away tap is reached quickly, while small
+      // adjustments stay smooth.
+      //   - Distance ≤ ~50 px : base speed (snappy short moves)
+      //   - Distance > 50 px  : accelerates linearly up to MAX_SPEED
+      // This is what makes the paddle "keep up" with a fast-moving finger.
       if (state.touchTargetX !== null) {
         const targetClamped = Math.max(0, Math.min(W - paddleW(), state.touchTargetX));
         const diff = targetClamped - state.paddleX;
-        const moveSpeed = 14;
-        if (Math.abs(diff) <= moveSpeed) state.paddleX = targetClamped;
-        else                              state.paddleX += Math.sign(diff) * moveSpeed;
+        const absDiff = Math.abs(diff);
+        const BASE = 20, MAX = 55;
+        const moveSpeed = Math.min(MAX, BASE + absDiff * 0.22);
+        if (absDiff <= moveSpeed) state.paddleX = targetClamped;
+        else                       state.paddleX += Math.sign(diff) * moveSpeed;
       }
       state.paddleX = Math.max(0, Math.min(W - paddleW(), state.paddleX));
       if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
@@ -3069,10 +3461,42 @@
     if (state.akhil.active) {
       state.akhil.rotation += 0.025; // spin (50% slower than before)
       const R = ballRadius();
+      const AKHIL_SPEED = 9.3;             // homing speed (+15% over prior 8.1)
+      const AKHIL_BOUNCE_TICKS = 17;       // ~30% less bounce distance than before
+      const STEEL_AVOID_RANGE = 130;       // start curving around steel within this radius
+      const STEEL_AVOID_STRENGTH = 5.5;    // how hard the repulsion pushes
+      // Helper: reflect velocity off the side of a brick the ball is overlapping,
+      // and nudge it out of the brick. Used for steel impacts.
+      function reflectOffBrick(b) {
+        // Use the previous position (one step back) to figure out which side hit.
+        const prevX = state.ball.x - state.ball.vx;
+        const prevY = state.ball.y - state.ball.vy;
+        const hitFromSide = (prevX + R <= b.x) || (prevX - R >= b.x + b.w);
+        const hitFromTop  = (prevY + R <= b.y) || (prevY - R >= b.y + b.h);
+        if (hitFromSide) state.ball.vx *= -1;
+        if (hitFromTop || !hitFromSide) state.ball.vy *= -1;
+        // Push ball out so it doesn't keep overlapping next frame.
+        if (state.ball.vx > 0 && state.ball.x - R < b.x + b.w) state.ball.x = b.x + b.w + R + 0.5;
+        if (state.ball.vx < 0 && state.ball.x + R > b.x)       state.ball.x = b.x - R - 0.5;
+        if (state.ball.vy > 0 && state.ball.y - R < b.y + b.h) state.ball.y = b.y + b.h + R + 0.5;
+        if (state.ball.vy < 0 && state.ball.y + R > b.y)       state.ball.y = b.y - R - 0.5;
+      }
+      // Helper: check if the ball overlaps any live steel brick, return it.
+      function overlappingSteel() {
+        for (const b of state.bricks) {
+          if (!b.alive || b.kind !== 'steel') continue;
+          if (state.ball.x + R > b.x && state.ball.x - R < b.x + b.w &&
+              state.ball.y + R > b.y && state.ball.y - R < b.y + b.h) return b;
+        }
+        return null;
+      }
       if (state.akhil.bounceTicks > 0) {
         // Brief "bounce away" after hitting a brick.
         state.ball.x += state.ball.vx;
         state.ball.y += state.ball.vy;
+        // If the bounce-away path runs into steel, reflect off it.
+        const s = overlappingSteel();
+        if (s) reflectOffBrick(s);
         state.akhil.bounceTicks--;
         if (state.akhil.bounceTicks === 0) state.akhil.target = null;
       } else {
@@ -3093,13 +3517,37 @@
           const tx = target.x + target.w/2, ty = target.y + target.h/2;
           const dx = tx - state.ball.x, dy = ty - state.ball.y;
           const d = Math.hypot(dx, dy) || 1;
-          const speed = 8.1;  // homing speed (+25% over original 6.5)
-          state.ball.vx = (dx / d) * speed;
-          state.ball.vy = (dy / d) * speed;
+          // Desired velocity straight at the target.
+          let vx = (dx / d) * AKHIL_SPEED;
+          let vy = (dy / d) * AKHIL_SPEED;
+          // Steering: add repulsion from nearby steel bricks so the ball curves
+          // ORGANICALLY around obstacles instead of phasing through them.
+          for (const b of state.bricks) {
+            if (!b.alive || b.kind !== 'steel') continue;
+            const bcx = b.x + b.w/2, bcy = b.y + b.h/2;
+            const sdx = state.ball.x - bcx, sdy = state.ball.y - bcy;
+            const sd = Math.hypot(sdx, sdy) || 1;
+            if (sd > STEEL_AVOID_RANGE) continue;
+            // Inverse-falloff: more push closer in. Curve grows naturally as the
+            // ball approaches steel; full strength when nearly touching.
+            const strength = (STEEL_AVOID_RANGE - sd) / STEEL_AVOID_RANGE;
+            vx += (sdx / sd) * STEEL_AVOID_STRENGTH * strength;
+            vy += (sdy / sd) * STEEL_AVOID_STRENGTH * strength;
+          }
+          // Renormalize so net speed stays constant regardless of how much
+          // repulsion was applied (otherwise the ball would race in open space
+          // and stall near steel).
+          const mag = Math.hypot(vx, vy) || 1;
+          state.ball.vx = (vx / mag) * AKHIL_SPEED;
+          state.ball.vy = (vy / mag) * AKHIL_SPEED;
           state.ball.x += state.ball.vx;
           state.ball.y += state.ball.vy;
-          // Hit?
-          if (state.ball.x + R > target.x && state.ball.x - R < target.x + target.w &&
+          // Steel collision (last line of defence — if steering wasn't enough).
+          const s = overlappingSteel();
+          if (s) reflectOffBrick(s);
+          // Hit the target?
+          if (target.alive &&
+              state.ball.x + R > target.x && state.ball.x - R < target.x + target.w &&
               state.ball.y + R > target.y && state.ball.y - R < target.y + target.h) {
             const destroyed = damageBrick(target);
             // Always bounce back so a tough brick (hp=2) requires two visits to break,
@@ -3107,7 +3555,7 @@
             // brick on consecutive frames and chip both HPs off in one "visit".
             state.ball.vx = -state.ball.vx;
             state.ball.vy = -state.ball.vy;
-            state.akhil.bounceTicks = 28;
+            state.akhil.bounceTicks = AKHIL_BOUNCE_TICKS;
             playAkhilLaugh();
             if (destroyed && state.bricks.every(bb => !bb.alive || bb.kind === 'steel')) {
               triggerLevelClear();
@@ -3162,6 +3610,7 @@
         state.ball.vy = Math.sin(angle) * speed;
         state.ball.lastPaddleHitTick = state.activeTicks;
         state.combo = 0;
+        playPaddleHit();
       }
 
       // floor — handle ball off bottom
@@ -3215,6 +3664,10 @@
           damageBrick(b, { force: true });
           for (const n of neighbors) damageBrick(n, { force: true });
           playExplosion();
+          // Screen shake — magnitude scales with how big the chain felt.
+          const chainCount = 1 + neighbors.length;
+          const mag = Math.min(10, 5 + chainCount * 0.7);
+          triggerShake(mag, 18);
           // Ball bounces off normally
           const hitFromSide = (prevX + R <= b.x) || (prevX - R >= b.x + b.w);
           const hitFromTop  = (prevY + R <= b.y) || (prevY - R >= b.y + b.h);
@@ -3272,6 +3725,7 @@
         e.vx = Math.cos(a) * sp; e.vy = Math.sin(a) * sp;
         e.lastPaddleHitTick = state.activeTicks;
         state.combo = 0;
+        playPaddleHit();
       }
       // Fell off bottom: just remove (no life lost as long as some ball still alive)
       if (e.y - R > H) {
@@ -3708,7 +4162,10 @@
     if (!state.fallingItem) return;
     const it = state.fallingItem;
     if (it.type === 'heart')         drawHeartItem(it);
-    else if (it.type === 'superKai') drawSuperKaiItem(it);
+    // SuperKai now uses the same glow-photo treatment as the PAPA item — just
+    // green-tinted, and a touch larger than the default. Drops the rotating
+    // sparkle stars + outer ring to feel calmer / more consistent.
+    else if (it.type === 'superKai') drawPhotoItem(it, photos.superKai, 'rgba(80, 240, 100, 0.95)', 1.55);
     else if (it.type === 'papa')     drawPhotoItem(it, photos.papaItem, 'rgba(91, 210, 255, 0.95)');
     else if (it.type === 'akhil')    drawPhotoItem(it, photos.akhilGlasses, 'rgba(255, 220, 60, 0.95)', 1.85);
     else                              drawBombItem(it);
@@ -4074,22 +4531,43 @@
     for (const p of state.popups) {
       const t = 1 - (p.life / p.maxLife);   // 0..1 over lifetime
       const alpha = Math.max(0, 1 - t);
-      const scale = 1 + t * 0.4;
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.scale(scale, scale);
-      ctx.font = 'bold 14px "Press Start 2P", monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.globalAlpha = alpha;
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = p.color;
-      ctx.fillText(p.text, 0, 0);
-      // White inner highlight for legibility
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.fillText(p.text, 0, 0);
+      if (p.kind === 'combo') {
+        // Combo callout: bigger, bouncier intro, slow pump, drifts up slightly.
+        const intro = Math.min(1, t * 4);          // 0..1 over first ~25% of life
+        const introScale = 0.6 + intro * 0.6;       // 0.6 → 1.2 quickly
+        const pump = 1 + Math.sin(t * Math.PI * 4) * 0.04 * (1 - t);
+        const drift = -18 * t;
+        ctx.translate(0, drift);
+        ctx.scale(introScale * pump, introScale * pump);
+        ctx.font = 'bold 24px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, 0, 0);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.fillText(p.text, 0, 0);
+      } else {
+        // Regular score popup (+points) — small, scales up while fading.
+        const scale = 1 + t * 0.4;
+        ctx.scale(scale, scale);
+        ctx.font = 'bold 14px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, 0, 0);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillText(p.text, 0, 0);
+      }
       ctx.restore();
     }
   }
@@ -4216,6 +4694,21 @@
       // Wrap the whole frame in try/catch — any unhandled error MUST NOT break
       // the RAF loop, or the game freezes with a blank canvas (was the bug).
       ctx.clearRect(0, 0, W, H);
+      // Screen shake: random translate offset, decaying linearly toward 0.
+      // Applied to all game draws but NOT the pause button or canvas flash so
+      // those UI elements stay rock-steady.
+      let shakeApplied = false;
+      if (shakeRemaining > 0) {
+        const decay = shakeRemaining / shakeTotalFrames; // 1 → 0
+        const mag = shakePeakMagnitude * decay;
+        const sx = (Math.random() - 0.5) * 2 * mag;
+        const sy = (Math.random() - 0.5) * 2 * mag;
+        ctx.save();
+        ctx.translate(sx, sy);
+        shakeApplied = true;
+        shakeRemaining--;
+        if (shakeRemaining <= 0) { shakePeakMagnitude = 0; shakeTotalFrames = 1; }
+      }
       drawSnowHearts();
       drawZigzagBorder();
       drawBricks();
@@ -4232,6 +4725,8 @@
       drawPapaHud();
       drawAkhilHud();
       drawHelp();
+      if (shakeApplied) ctx.restore();
+      // Canvas flash + pause button drawn UNSHAKEN so they don't dance around.
       drawCanvasFlash();
       drawPauseButton();
     } catch (err) {
@@ -4256,6 +4751,19 @@
   startLevel(1);
   requestAnimationFrame(frame);
 })();
+
+// ---------- PWA service worker registration ----------
+// Once installed, the game's assets are cached locally so it loads instantly
+// and works offline. The worker auto-updates in the background; on next launch
+// the new version takes effect. Failures here are non-fatal — the game still
+// runs without it.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('[Kai Breakout] SW registration failed:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
