@@ -369,20 +369,6 @@
     0%, 100% { box-shadow: 0 0 30px rgba(91, 210, 255, 0.85), inset 0 2px 0 rgba(255,255,255,0.6); }
     50%      { box-shadow: 0 0 50px rgba(91, 210, 255, 1), inset 0 2px 0 rgba(255,255,255,0.7); }
   }
-  /* On short viewports (phone landscape) use more vertical space for the logo
-     and pack everything tighter so START GAME doesn't overlap the footer. */
-  @media (max-height: 480px) {
-    #title-logo    { max-height: 62vh; max-width: 78vw; }
-    .title-tagline { font-size: 10px; letter-spacing: 3px; }
-    #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
-    /* Tighter top margin → logo gets more headroom above. */
-    .title-content { gap: 6px; margin-top: -1vh; }
-    /* Squash the footer so the whole copyright fits on a single line. */
-    .title-footer { font-size: 8px; letter-spacing: 1.2px; bottom: 8px; white-space: nowrap; }
-    /* The split between the two halves of the copyright lives inside HTML; on
-       this size we want it inline as one continuous line. */
-    .copyright-rights::before { content: " · "; }
-  }
   .title-footer {
     position: absolute;
     bottom: 24px;
@@ -395,16 +381,40 @@
     color: #6a85ab;
     z-index: 2;
     text-shadow: 0 0 8px rgba(91, 210, 255, 0.25);
-    /* Allow the two halves to break onto two lines on narrow viewports while
-       keeping each half (·-joined) on a single line. */
     line-height: 1.8;
   }
-  /* Each half of the copyright is a nowrap span — the natural wrap point is the
-     space between them. So "© 2026 · A PAPA & KAI PRODUCTION" stays together
-     and "ALL RIGHTS RESERVED" may move to a second line, never mid-phrase. */
+  /* Each half of the copyright is a nowrap span so neither breaks mid-phrase. */
   .copyright-main, .copyright-rights { white-space: nowrap; display: inline-block; }
-  /* Default separator between the two halves: a bullet on the second one. */
+  /* Default (wide viewports): both halves inline, bullet between them. */
   .copyright-rights::before { content: " · "; }
+
+  /* ---------- PHONE PORTRAIT (and other narrow viewports) ----------
+     Force the copyright onto two lines: line 1 = © 2026 · A PAPA & KAI
+     PRODUCTION, line 2 = ALL RIGHTS RESERVED (no leading bullet). Smaller
+     font so it never gets clipped at the side. */
+  @media (max-width: 700px) {
+    .copyright-rights         { display: block; }
+    .copyright-rights::before { content: ""; }
+    .title-footer { font-size: 9px; letter-spacing: 1.4px; line-height: 1.7; bottom: 14px; }
+  }
+  @media (max-width: 400px) {
+    .title-footer { font-size: 8px; letter-spacing: 0.9px; }
+  }
+
+  /* ---------- PHONE LANDSCAPE (short viewports) ----------
+     Bigger logo, push everything up, lock footer at bottom on a single line.
+     padding-bottom on title-content guarantees the START button never crashes
+     into the absolutely-positioned footer. */
+  @media (max-height: 480px) {
+    #title-logo    { max-height: 70vh; max-width: 82vw; }
+    .title-tagline { font-size: 10px; letter-spacing: 3px; }
+    #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
+    .title-content { gap: 4px; margin-top: -3vh; padding-bottom: 40px; }
+    /* Override the portrait two-line layout: in landscape we keep it inline. */
+    .copyright-rights         { display: inline-block; }
+    .copyright-rights::before { content: " · "; }
+    .title-footer { font-size: 8px; letter-spacing: 1.2px; bottom: 6px; white-space: nowrap; line-height: 1; }
+  }
 
   #endgame-overlay {
     position: absolute;
@@ -430,6 +440,9 @@
       inset 0 0 24px rgba(91, 210, 255, 0.08);
     min-width: 380px;
     position: relative;
+    /* Stack the card ABOVE the fireworks so kaiball + CONGRATULATIONS sit
+       in front of the bursts. */
+    z-index: 2;
   }
   #endgame-face {
     width: 130px;
@@ -536,6 +549,7 @@
     opacity: 0;
     background: currentColor;
     box-shadow: 0 0 6px currentColor;
+    z-index: 1;  /* under the .endgame-card (which is z-index: 2) */
   }
   /* Bigger radial starburst with 24 spokes (3 rings) + glow, much more visible. */
   @keyframes firework-burst {
@@ -621,19 +635,19 @@
     align-items: center;
     justify-content: space-between;
     gap: 36px;
-    padding: 10px 18px;
+    padding: 12px 20px;
     border-radius: 8px;
     background: rgba(15, 22, 50, 0.5);
     border: 1px solid rgba(91, 210, 255, 0.2);
     font-family: "Press Start 2P", monospace;
-    font-size: 11px;
+    font-size: 13px;
     letter-spacing: 2px;
   }
   .complete-row .label { color: #88c4ff; }
   .complete-row .value {
     font-family: "Orbitron", monospace;
     font-weight: 800;
-    font-size: 22px;
+    font-size: 28px;
     color: #fff;
     text-shadow: 0 0 10px rgba(150, 210, 255, 0.85);
   }
@@ -642,9 +656,9 @@
     background: rgba(40, 30, 8, 0.5);
     margin-top: 6px;
   }
-  .complete-row.total .label { color: #ffd76b; }
+  .complete-row.total .label { color: #ffd76b; font-size: 15px; }
   .complete-row.total .value {
-    color: #ffe88a; font-size: 26px;
+    color: #ffe88a; font-size: 34px;
     text-shadow: 0 0 12px rgba(255, 220, 100, 0.95);
   }
   #complete-next {
@@ -1664,7 +1678,7 @@
   const AKHIL_DURATION_TICKS    = 60 * 15;  // 15s
   const PAPA_PADDLE_MULT = 3.0;             // PAPA paddle length multiplier
   const MAX_LEVEL = 7;
-  const ITEM_W = 60, ITEM_H = 60, ITEM_FALL_SPEED = 1.06;  // 15% slower than 1.25
+  const ITEM_W = 60, ITEM_H = 60, ITEM_FALL_SPEED = 1.22;  // +15% over prior 1.06
   const SPAWN_INTERVAL_TICKS = 60 * 60;     // 1 minute between spawns
 
   // Weighted random pick. Common: superkai + papa. Uncommon: akhil + mama. Rare: nozomi.
@@ -2082,10 +2096,12 @@
     // first so the chime doesn't fight the score-counter ticks.
     const total = bricksPts + levelBonus + timeBonus;
     setTimeout(() => {
-      animateNumber(completeBricksEl, 0, bricksPts, 750, () => {
-        animateNumber(completeBonusEl, 0, levelBonus, 625, () => {
-          animateNumber(completeTimeEl, 0, timeBonus, 625, () => {
-            animateNumber(completeTotalEl, 0, total, 875, () => {
+      // Durations bumped a further +25% so the score-roll feels weighty and
+      // the tick blips can pile up into a satisfying "coins pouring out" sound.
+      animateNumber(completeBricksEl, 0, bricksPts, 940, () => {
+        animateNumber(completeBonusEl, 0, levelBonus, 780, () => {
+          animateNumber(completeTimeEl, 0, timeBonus, 780, () => {
+            animateNumber(completeTotalEl, 0, total, 1090, () => {
               completeNextBtn.classList.add('ready');
             });
           });
@@ -2102,10 +2118,10 @@
   function animateNumber(el, from, to, duration, done) {
     const start = performance.now();
     // Skip ticks entirely for trivial counts so we don't spam audio for tiny values.
-    // Denser ticks (every ~55ms) so a slow rolling counter sounds like coins
-    // pouring out, not a few isolated bleeps.
+    // Denser ticks (~every 38 ms, up to 28 per row) so a slow rolling counter
+    // sounds like coins pouring out, not a few isolated bleeps.
     const range = Math.abs(to - from);
-    const TICK_COUNT = range < 5 ? 0 : Math.min(18, Math.max(5, Math.round(duration / 55)));
+    const TICK_COUNT = range < 5 ? 0 : Math.min(28, Math.max(7, Math.round(duration / 38)));
     let nextTickIdx = 0;
     function step(now) {
       const t = Math.min(1, (now - start) / duration);
@@ -2498,10 +2514,33 @@
   function hideBanner() { banner.style.display = 'none'; }
 
   // ---------- Input ----------
-  canvas.addEventListener('mousemove', e => {
+  // The "paddle control zone" is the canvas PLUS the area directly below it
+  // (X bounded by the canvas's horizontal edges, Y from canvas top down to
+  // the bottom of the viewport). Dragging or moving in that zone steers the
+  // paddle — convenient when the player's thumb naturally rests below the
+  // canvas on a phone.
+  function pointerInControlZone(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (W / rect.width);
-    state.paddleX = Math.max(0, Math.min(W - paddleW(), x - paddleW()/2));
+    if (clientX < rect.left || clientX > rect.right) return null;
+    if (clientY < rect.top) return null;
+    return {
+      x: (clientX - rect.left) * (W / rect.width),
+      y: (clientY - rect.top)  * (H / rect.height),
+      onCanvas: clientY <= rect.bottom,
+    };
+  }
+  // Centralized "can the player steer the paddle right now?" check. Used by
+  // both mouse + touch paths to enforce: not paused, game started, not in any
+  // end-of-level / endgame popup.
+  function paddleControlActive() {
+    return gameStarted && !state.paused && !state.over && !state.won
+        && !state.levelTransitioning;
+  }
+  window.addEventListener('mousemove', e => {
+    if (!paddleControlActive()) return;
+    const p = pointerInControlZone(e.clientX, e.clientY);
+    if (!p) return;
+    state.paddleX = Math.max(0, Math.min(W - paddleW(), p.x - paddleW()/2));
     if (state.ball.stuck) state.ball.x = state.paddleX + paddleW()/2;
   });
   function setPaused(p) { state.paused = p; }
@@ -2560,6 +2599,18 @@
     ctx.restore();
   }
 
+  // Shared gate for "manual" item activation (logo taps + keyboard hotkeys).
+  // The natural 60s spawn doesn't go through this check.
+  function canActivateItem() {
+    return gameStarted
+        && !state.paused
+        && !state.ball.stuck            // ball must be in flight
+        && !state.over && !state.won
+        && !state.levelTransitioning
+        && !state.fallingItem
+        && !state.nozomi.active && !state.madMama.active
+        && !state.superKai.active && !state.papa.active && !state.akhil.active;
+  }
   window.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft')  state.keys.left  = true;
     if (e.key === 'ArrowRight') state.keys.right = true;
@@ -2567,19 +2618,11 @@
       if (!state.ball.stuck && !state.over && !state.won) setPaused(!state.paused);
     }
     // (M key mute removed per request — game audio plays unmuted.)
-    // Debug / testing: spawn specific items instantly.
+    // Manual item spawn via number keys: gated by the shared canActivateItem().
     //  '1' = SUPERKAI, '2' = PAPA, '3' = AKHIL, '4' = MAD MAMA, '5' = NOZOMI
-    function modeBlocked() {
-      return state.fallingItem || state.nozomi.active || state.madMama.active
-          || state.superKai.active || state.papa.active || state.akhil.active
-          || state.over || state.won;
-    }
-    // Keyboard item spawn — same feedback as the touch path:
-    // bigger "fire" glow on the logo, plus the dah-ding confirm chime. A single
-    // hotkey is treated as an immediate commit.
     const KEY_TO_ITEM = { '1': 'superKai', '2': 'papa', '3': 'akhil', '4': 'bomb', '5': 'heart' };
     const keyItem = KEY_TO_ITEM[e.key];
-    if (keyItem && !modeBlocked() && gameStarted) {
+    if (keyItem && canActivateItem()) {
       spawnFallingItem(keyItem);
       pulseLogo(keyItem, 'fire');
       playItemSelectChime();
@@ -2641,37 +2684,39 @@
     if (!logoEl) return;
     let taps = 0;
     let resetTimer = null;
-    function modeBlocked() {
-      return !gameStarted
-          || state.fallingItem || state.nozomi.active || state.madMama.active
-          || state.superKai.active || state.papa.active || state.akhil.active
-          || state.over || state.won || state.levelTransitioning;
+    // Taps cycle through 5 items. The 6th tap wraps back to slot 1 (no auto
+    // commit at 5) — so a long tap stream just walks colors around the ring
+    // until the player stops and the idle timer fires.
+    function tapIndex() {
+      // 1-based, but cycles. tap 1 → 1, tap 5 → 5, tap 6 → 1, tap 10 → 5, etc.
+      return ((taps - 1) % ITEM_BY_TAP.length) + 1;
     }
     function fire() {
-      if (modeBlocked()) return;
-      const t = Math.min(taps, ITEM_BY_TAP.length);
-      if (t < 1) return;
-      const itemType = ITEM_BY_TAP[t - 1];
+      if (!canActivateItem()) return;
+      if (taps < 1) return;
+      const itemType = ITEM_BY_TAP[tapIndex() - 1];
       spawnFallingItem(itemType);
       // Bigger glow + "dah-ding!" confirm chime when an item locks in.
       pulseLogo(itemType, 'fire');
       playItemSelectChime();
     }
     function onTouchTap(ev) {
+      // Hard-block taps when activation isn't allowed (paused, pre-launch,
+      // popup up, item already falling, mode active). Counter resets to 0.
+      if (!canActivateItem()) {
+        taps = 0;
+        if (resetTimer) { clearTimeout(resetTimer); resetTimer = null; }
+        return;
+      }
       ev.preventDefault();
       taps++;
-      // Glow color reflects what WILL spawn at the current tap count.
-      const previewType = ITEM_BY_TAP[Math.min(taps, ITEM_BY_TAP.length) - 1];
+      // Glow color reflects what WILL spawn at the current tap count (cycling).
+      const previewType = ITEM_BY_TAP[tapIndex() - 1];
       pulseLogo(previewType, 'tap');
       // Light tactile click on every tap (distinct from the fire chime).
       playLogoTap();
-      if (taps >= 5) {
-        fire();
-        taps = 0;
-        if (resetTimer) clearTimeout(resetTimer);
-        resetTimer = null;
-        return;
-      }
+      // No auto-commit at exactly 5 anymore — keep counting; the player's
+      // idle pause commits whatever slot they last landed on.
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = setTimeout(() => {
         fire();
@@ -2704,15 +2749,22 @@
   });
 
   // ---------- Touch controls (mobile / iPad) ----------
-  // Touching anywhere sets a TARGET x; the paddle slides toward it at a fixed
-  // speed per tick (no teleport). Dragging continuously updates the target so
-  // the paddle still tracks the finger.
-  //   • Tap (no movement, low Y) during gameplay = launches a stuck ball,
-  //     advances level-complete screen, or dismisses title/endgame.
-  //   • Tap (no movement, HIGH Y — top 60% of canvas) during active play = pause.
+  // Touches anywhere in the control zone (canvas + below) steer the paddle.
+  // The drag continues even if the finger leaves the zone (we track the touch
+  // identifier from start).
+  //   • Tap (no movement) outside the pause button:
+  //       - title not dismissed → dismiss
+  //       - end-of-level popup → advance
+  //       - game over / win → restart
+  //       - paused → resume (anywhere in canvas)
+  //       - ball stuck → launch
   state.touchTargetX = null;
   let touchStartX = 0, touchStartY = 0, touchMoved = false;
   let touchOnPauseBtn = false;
+  // True while the player is actively dragging the paddle. Set on touchstart
+  // (if the start is inside the control zone and not on the logo / pause btn /
+  // some other interactive child) and cleared on touchend.
+  let touchDragging = false;
   function touchPosToCanvas(touch) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -2720,27 +2772,47 @@
       y: (touch.clientY - rect.top)  * (H / rect.height),
     };
   }
-  canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
+  // Filter: ignore touches that land on the logo (it has its own tap counter)
+  // or other interactive HTML controls.
+  function touchOnInteractiveChild(target) {
+    if (!target || target === canvas || target === document.body) return false;
+    return target.closest && target.closest('#logo, #title-screen, #endgame-overlay, #level-complete, button');
+  }
+  document.addEventListener('touchstart', e => {
     const t = e.touches[0];
     if (!t) return;
+    if (touchOnInteractiveChild(e.target)) return;  // let logo / buttons handle it
+    const inZone = pointerInControlZone(t.clientX, t.clientY);
+    // Only act if the touch starts inside the canvas itself OR the extended
+    // zone (below canvas, within X range). Above the canvas — no effect.
+    if (!inZone) return;
+    e.preventDefault();
     touchStartX = t.clientX;  touchStartY = t.clientY;  touchMoved = false;
-    const p = touchPosToCanvas(t);
-    // If the tap lands inside the pause button area, treat it as a button press —
-    // don't steer the paddle toward the corner.
-    touchOnPauseBtn = canPause() && isInPauseButton(p.x, p.y);
-    if (!touchOnPauseBtn) state.touchTargetX = p.x - paddleW()/2;
+    touchDragging = true;
+    // If the tap lands inside the pause button area (only meaningful when
+    // touch is ON the canvas, not below), treat it as a button press.
+    touchOnPauseBtn = inZone.onCanvas && canPause() && isInPauseButton(inZone.x, inZone.y);
+    if (!touchOnPauseBtn && paddleControlActive()) {
+      state.touchTargetX = inZone.x - paddleW()/2;
+    }
   }, { passive: false });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
+  document.addEventListener('touchmove', e => {
+    if (!touchDragging) return;
     const t = e.touches[0];
     if (!t) return;
+    e.preventDefault();
     if (Math.abs(t.clientX - touchStartX) > 8 || Math.abs(t.clientY - touchStartY) > 8) touchMoved = true;
     if (touchOnPauseBtn) return;  // pause-button press — don't move paddle while finger drags
-    const p = touchPosToCanvas(t);
-    state.touchTargetX = p.x - paddleW()/2;
+    if (!paddleControlActive()) return;
+    // Convert to canvas-X even if the finger has drifted outside the zone;
+    // we clamp to [0, W - paddleW] downstream so it just rests at the edge.
+    const rect = canvas.getBoundingClientRect();
+    const cx = (t.clientX - rect.left) * (W / rect.width);
+    state.touchTargetX = cx - paddleW()/2;
   }, { passive: false });
-  canvas.addEventListener('touchend', e => {
+  document.addEventListener('touchend', e => {
+    if (!touchDragging) return;
+    touchDragging = false;
     e.preventDefault();
     state.touchTargetX = null;  // stop sliding paddle
     // Pause-button tap: release within button, no significant drag → toggle pause.
@@ -2750,14 +2822,13 @@
       return;
     }
     if (touchMoved) return;
-    // It was a tap, not a drag. Figure out what to do.
+    // Tap (not drag). Decide what to do based on game state.
     if (!gameStarted) { dismissTitle(); return; }
     if (state.levelTransitioning) { advanceToNextLevel(); return; }
     if (state.over || state.won) { restart(); return; }
-    // If paused, ANY tap on the canvas resumes the game.
+    // If paused, ANY tap inside the zone resumes the game.
     if (state.paused) { setPaused(false); return; }
     if (state.ball.stuck) { launchBall(); return; }
-    // Pause is only triggered by the corner button now.
   }, { passive: false });
 
   function restart() {
@@ -2951,7 +3022,11 @@
         state.fallingItem = null;
         scheduleNextSpawn();
       } else if (!state.nozomi.active && !state.madMama.active && !state.superKai.active
-              && !state.papa.active && !state.akhil.active) {
+              && !state.papa.active && !state.akhil.active
+              && !state.ball.stuck) {
+        // Items can only be caught when the ball is actively in play —
+        // catching pre-launch (while the ball is still on the paddle) would
+        // start a mode the player can't yet interact with.
         const paddleY = paddleTopY();
         const overlapX = it.x < state.paddleX + paddleW() && it.x + it.w > state.paddleX;
         const overlapY = it.y + it.h >= paddleY && it.y <= (H - 30) + PADDLE_H + 6;
@@ -2968,9 +3043,11 @@
     }
 
     // --- Paddle motion ---
+    // While paused, the paddle stays put — no key, mouse, or touch can move it.
+    const allowPaddleMotion = !state.paused;
     if (state.nozomi.active) {
-      state.nozomi.paddlePerim += PERIM_SPEED;
-    } else {
+      if (allowPaddleMotion) state.nozomi.paddlePerim += PERIM_SPEED;
+    } else if (allowPaddleMotion) {
       const kspeed = 9;
       if (state.keys.left)  state.paddleX -= kspeed;
       if (state.keys.right) state.paddleX += kspeed;
