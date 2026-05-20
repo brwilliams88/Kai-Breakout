@@ -385,17 +385,21 @@
   }
   /* Each half of the copyright is a nowrap span so neither breaks mid-phrase. */
   .copyright-main, .copyright-rights { white-space: nowrap; display: inline-block; }
-  /* DEFAULT (wide viewports): both halves render inline on one line, separated
-     by a bullet. The bullet uses TWO non-breaking spaces on each side so the
-     spacing matches the bullets inside copyright-main exactly. */
+  /* DEFAULT: both halves inline on one line with a bullet between them. The
+     bullet uses TWO non-breaking spaces on each side so the spacing matches
+     the bullets inside copyright-main exactly. */
   .copyright-rights::before { content: "\00a0\00a0·\00a0\00a0"; }
 
-  /* Narrow viewports (phone portrait): one line can't fit, so force the rights
-     half onto its own block — and DROP the leading bullet so line 2 starts
-     cleanly with "ALL RIGHTS RESERVED" instead of " · ALL RIGHTS...". */
+  /* JS-driven layout when the two halves DON'T fit on one line: force the
+     rights half onto its own block and drop the leading bullet. The detection
+     compares the top offsets of the two spans and toggles this class on the
+     body — works at any viewport width, not just below an arbitrary breakpoint. */
+  body.copyright-stacked .copyright-rights         { display: block; }
+  body.copyright-stacked .copyright-rights::before { content: ""; }
+
+  /* Narrow-viewport font shrink so the line-1 string doesn't get clipped at
+     the sides. (The wrap/no-bullet logic is JS-driven, above.) */
   @media (max-width: 720px) {
-    .copyright-rights         { display: block; }
-    .copyright-rights::before { content: ""; }
     .title-footer { font-size: 9px; letter-spacing: 1.4px; line-height: 1.7; bottom: 14px; }
   }
   @media (max-width: 400px) {
@@ -405,15 +409,15 @@
   /* ---------- PHONE LANDSCAPE (short viewports) ----------
      Bigger logo, push everything up, lock footer at bottom on a single line.
      padding-bottom on title-content guarantees the START button never crashes
-     into the absolutely-positioned footer. Override the narrow-width rule to
-     keep both halves inline with the bullet. */
+     into the absolutely-positioned footer. We FORCE the copyright back inline
+     here regardless of JS detection (short widths shrink the font to fit). */
   @media (max-height: 480px) {
     #title-logo    { max-height: 70vh; max-width: 82vw; }
     .title-tagline { font-size: 10px; letter-spacing: 3px; }
     #title-start   { font-size: 14px; padding: 11px 24px; letter-spacing: 2.5px; border-width: 2px; }
     .title-content { gap: 4px; margin-top: -3vh; padding-bottom: 40px; }
-    .copyright-rights         { display: inline-block; }
-    .copyright-rights::before { content: "\00a0\00a0·\00a0\00a0"; }
+    body.copyright-stacked .copyright-rights         { display: inline-block; }
+    body.copyright-stacked .copyright-rights::before { content: "\00a0\00a0·\00a0\00a0"; }
     .title-footer { font-size: 8px; letter-spacing: 1.2px; bottom: 6px; white-space: nowrap; line-height: 1; }
   }
 
@@ -1008,13 +1012,37 @@
       } catch (_) {}
     }
   }
+  // ---------- Copyright wrap detection ----------
+  // Determines at runtime whether copyright-main and copyright-rights are on
+  // the same line, and toggles `body.copyright-stacked` accordingly. This is
+  // what makes the leading "·" disappear cleanly the moment ARR wraps onto
+  // its own line — works at any viewport width, no breakpoint guessing.
+  function updateCopyrightLayout() {
+    const main   = document.querySelector('.copyright-main');
+    const rights = document.querySelector('.copyright-rights');
+    if (!main || !rights) return;
+    // Toggle OFF first so we measure the natural inline layout each time.
+    document.body.classList.remove('copyright-stacked');
+    // Force a reflow then compare top offsets. >2px difference = different lines.
+    const a = main.getBoundingClientRect();
+    const b = rights.getBoundingClientRect();
+    if (Math.abs(a.top - b.top) > 2) {
+      document.body.classList.add('copyright-stacked');
+    }
+  }
   // Recompute on resize / orientation / when returning from the iOS bar collapse.
-  window.addEventListener('resize',           () => { updateGameScale(); checkOrientation(); });
-  window.addEventListener('orientationchange',() => { updateGameScale(); checkOrientation(); });
+  window.addEventListener('resize',           () => { updateGameScale(); checkOrientation(); updateCopyrightLayout(); });
+  window.addEventListener('orientationchange',() => { updateGameScale(); checkOrientation(); updateCopyrightLayout(); });
   window.visualViewport && window.visualViewport.addEventListener('resize',
-                                                () => { updateGameScale(); checkOrientation(); });
+                                                () => { updateGameScale(); checkOrientation(); updateCopyrightLayout(); });
   updateGameScale();
   checkOrientation();
+  updateCopyrightLayout();
+  // Re-run once fonts have actually loaded (Press Start 2P) — initial measure
+  // can be off if the font hadn't downloaded yet.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(updateCopyrightLayout).catch(() => {});
+  }
 
   // Auto-pause the game when the tab/window goes inactive (and stop music timers
   // through the existing pause path — they all silently no-op while paused).
@@ -1086,6 +1114,14 @@
     }
     // Small celebratory blip (reuse the dah-ding chime — short, joyful).
     if (typeof playItemSelectChime === 'function') playItemSelectChime();
+  }
+  // Cancel an in-flight high-score flash. Called when a popup menu (level
+  // complete, endgame) opens so the gold banner doesn't overlap the menu.
+  function hideHighScoreFlash() {
+    const flashEl = document.getElementById('hiscore-flash');
+    if (flashEl) flashEl.classList.remove('show');
+    const statEl = document.querySelector('.stat-high');
+    if (statEl) statEl.classList.remove('flashing');
   }
   function setScore(s) {
     scoreEl.textContent = s;
@@ -2206,6 +2242,8 @@
     stopNozomiMusic(); stopMadMamaMusic(); stopSuperKaiMusic(); stopPapaMusic(); stopAkhilMusic();
     state.fallingItem = null;
     state.extras.length = 0;
+    // Dismiss any in-flight high-score flash so it doesn't overlap the popup.
+    hideHighScoreFlash();
     if (clearedLevel < MAX_LEVEL) {
       playLevelJingle();
       showLevelComplete(clearedLevel, bricksPts, flat, timeBonus);
@@ -2369,6 +2407,8 @@
 
   function showEndgame(kind) {
     const isWin = kind === 'win';
+    // Dismiss any in-flight high-score flash so it doesn't overlap this menu.
+    hideHighScoreFlash();
     // Title is fixed by win/lose state — DON'T overwrite for new-high.
     // GAME OVER stays red; YOU WIN stays blue. New-high celebration goes
     // into a dedicated gold badge below the title.
@@ -2623,6 +2663,7 @@
     state.akhil.target = null;
     state.akhil.bounceTicks = 0;
     state.akhil.posHistory = null;   // fresh stagnation tracker
+    state.akhil.stallCount = 0;
     if (state.ball.stuck) launchBall();
     playPowerSound();
     flashCanvas('akhil');
@@ -3579,33 +3620,72 @@
           }
           return bestClear || bestAny;
         }
+        // Pick the closest brick that's NOT the current target (used as a
+        // recovery target when we detect stagnation).
+        function pickAlternateTarget(exclude) {
+          let bestClear = null, bestClearD = Infinity;
+          let bestAny   = null, bestAnyD   = Infinity;
+          for (const b of state.bricks) {
+            if (!b.alive || b.kind === 'steel') continue;
+            if (b === exclude) continue;
+            const cx = b.x + b.w/2, cy = b.y + b.h/2;
+            const dx = cx - state.ball.x, dy = cy - state.ball.y;
+            const d = dx*dx + dy*dy;
+            if (d < bestAnyD) { bestAnyD = d; bestAny = b; }
+            if (d < bestClearD && lineOfSightClear(cx, cy)) {
+              bestClearD = d; bestClear = b;
+            }
+          }
+          return bestClear || bestAny;
+        }
         // Re-acquire target when current is dead, gone, or steel (defensive).
         if (!state.akhil.target || !state.akhil.target.alive || state.akhil.target.kind === 'steel') {
           state.akhil.target = pickTarget();
-          state.akhil.posHistory = null;  // reset stagnation tracker
+          state.akhil.posHistory = null;
         }
-        // ---- Stagnation watchdog ----
-        // If the ball hasn't moved ≥50 px in the last 28 ticks, the steering
-        // is stuck (oscillating near steel, target trapped behind a wall,
-        // etc). Force re-pick + a tiny random nudge to break the symmetry.
+        // ---- Aggressive stagnation watchdog ----
+        // Window: 30 ticks (~500ms). If the ball travelled <35px net during
+        // that window, it's stuck (oscillating near steel, trapped in a pocket,
+        // orbiting an unreachable target). Escalating recovery:
+        //   • 1st stall: switch to an alternate target + small nudge
+        //   • 2nd stall: alternate target + bigger random nudge (30px)
+        //   • 3rd stall: FAILSAFE — teleport ball to open sky above a random
+        //     live non-steel brick. Guaranteed line-of-sight; resumes homing.
         if (!state.akhil.posHistory) state.akhil.posHistory = [];
+        if (state.akhil.stallCount === undefined) state.akhil.stallCount = 0;
         state.akhil.posHistory.push(state.ball.x, state.ball.y);
-        if (state.akhil.posHistory.length > 56) state.akhil.posHistory.splice(0, 2);
-        if (state.akhil.posHistory.length === 56) {
-          const x0 = state.akhil.posHistory[0], y0 = state.akhil.posHistory[1];
-          const xN = state.akhil.posHistory[54], yN = state.akhil.posHistory[55];
+        if (state.akhil.posHistory.length > 60) state.akhil.posHistory.splice(0, 2);
+        if (state.akhil.posHistory.length === 60) {
+          const x0 = state.akhil.posHistory[0],  y0 = state.akhil.posHistory[1];
+          const xN = state.akhil.posHistory[58], yN = state.akhil.posHistory[59];
           const traveled = Math.hypot(xN - x0, yN - y0);
-          if (traveled < 50) {
-            // Pick a fresh target — preferring a NEW one if available.
-            const prevTarget = state.akhil.target;
-            state.akhil.target = pickTarget();
-            // If we're stuck on the same target, nudge ball away from current
-            // steel cluster to escape the pocket.
-            if (state.akhil.target === prevTarget) {
-              state.ball.x += (Math.random() - 0.5) * 8;
-              state.ball.y += (Math.random() - 0.5) * 8;
+          if (traveled < 35) {
+            state.akhil.stallCount++;
+            if (state.akhil.stallCount >= 3) {
+              // FAILSAFE TELEPORT: pick a random live non-steel brick, then
+              // park the ball ~90px above its top edge (which is open canvas).
+              const candidates = state.bricks.filter(b => b.alive && b.kind !== 'steel');
+              if (candidates.length) {
+                const tgt = candidates[Math.floor(Math.random() * candidates.length)];
+                state.ball.x = Math.max(R + 12, Math.min(W - R - 12, tgt.x + tgt.w/2));
+                // 90px above the brick — open space above the brick rows.
+                state.ball.y = Math.max(R + 8, tgt.y - 90);
+                state.akhil.target = tgt;
+              }
+              state.akhil.stallCount = 0;
+            } else {
+              // Try a different target + nudge proportional to attempt #.
+              const prev = state.akhil.target;
+              const alt = pickAlternateTarget(prev);
+              state.akhil.target = alt || pickTarget();
+              const nudge = state.akhil.stallCount === 1 ? 14 : 30;
+              state.ball.x += (Math.random() - 0.5) * nudge;
+              state.ball.y += (Math.random() - 0.5) * nudge;
             }
             state.akhil.posHistory = [];
+          } else {
+            // Made progress — reset stall counter.
+            state.akhil.stallCount = 0;
           }
         }
         const target = state.akhil.target;
