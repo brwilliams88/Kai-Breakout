@@ -20,6 +20,42 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 # ---- Data: newest at the top, oldest at the bottom ----
 VERSIONS = [
     {
+        "version": "v12",
+        "date":    "May 25, 2026",
+        "summary": (
+            "Akhil ball SLOWER (9.3 → 7.6) — constant homing made the v11.1 "
+            "ball feel faster than older versions; this restores the old "
+            "perceived pace. "
+            "Akhil collision priority FIXED: damage non-steel bricks first, "
+            "skip the steel check if we damaged one this tick — kills the "
+            "'steel clang sound + brick not breaking' oscillation between "
+            "adjacent steel + tough bricks. "
+            "Akhil-steel angle randomization: ±20° rotation on each steel "
+            "hit so the ball doesn't bounce back-and-forth into the same "
+            "steel from the same angle. "
+            "Mode HUD pill shifted up (y 36 → 22 when no boss) so the "
+            "bottom edge no longer touches the top brick row. "
+            "Boss music transitions FIXED: when Big G dies with a mode "
+            "active, that mode's music starts back up (was leaving silence); "
+            "no-mode case still restores chill. "
+            "Big G hit 'ghost image' artifact REMOVED — was the random "
+            "flinch-teleport flashing her at a different position for one "
+            "frame before figure-8 update snapped her back. Now she stays "
+            "on the figure-8 path; sparks + hit sprite + screen shake carry "
+            "all the impact. "
+            "Revived TOUGH bricks now also use the purple cursed palette + "
+            "pulsing border + sparkles (was showing original color tint). "
+            "BIG G HAS ARRIVED! purple stroked banner during the intro "
+            "state — fade-in/hold/fade-out, gentle scale pulse. Ball is "
+            "fully frozen during the boss intro so the player can't lose "
+            "during the entrance cinematic. "
+            "On level 7 she now waits to spawn until the ball is launched "
+            "(carryover from round-2 polish, calling it out explicitly). "
+            "sw.js CACHE_VERSION bumped to v12 — required to invalidate "
+            "stale service-worker caches on already-installed clients."
+        ),
+    },
+    {
         "version": "v11",
         "date":    "May 24-25, 2026",
         "summary": (

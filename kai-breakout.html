@@ -3185,12 +3185,22 @@
     state.paddleStunUntilTick = 0;
     stopBossMusic();
     if (state.akhilReaction.active) cancelAkhilReaction();
-    // Restore chill music if the player is still in play (and no mode is
-    // running — mode music returns to silence too since we suppressed it).
+    // ---- Restore music after boss is gone (v12) ----
+    // Three cases:
+    //   - A power-up mode is still running → start THAT mode's music (it was
+    //     suppressed when the boss spawned; resume it now).
+    //   - No mode running → start chill.
+    //   - Level transitioning / game over / won → no music start.
+    // The chill/start-mode functions already bail if !state.bigG.active is
+    // false, but boss is now inactive so they'll succeed.
     const playable = !state.over && !state.won && !state.levelTransitioning;
-    if (playable && !state.nozomi.active && !state.madMama.active &&
-        !state.superKai.active && !state.papa.active && !state.akhil.active) {
-      startChillMusic();
+    if (playable) {
+      if      (state.nozomi.active)   startNozomiMusic();
+      else if (state.madMama.active)  startMadMamaMusic();
+      else if (state.superKai.active) startSuperKaiMusic();
+      else if (state.papa.active)     startPapaMusic();
+      else if (state.akhil.active)    startAkhilMusic();
+      else                            startChillMusic();
     }
     // Defensive level-clear check: if the boss was the last thing standing
     // (all bricks already cleared before the kill), trigger level advance.
@@ -3271,16 +3281,12 @@
     state.bigG.hitUntilTick = state.activeTicks + 12;
     state.bigG.barShakeUntilTick = state.activeTicks + 10;
     state.bigG.state = 'hit';
-    // Flinch dash: jump to a new random position in the safe zone.
-    const newX = 60 + Math.random() * (W - 120 - BIGG_W);
-    const newY = 50 + Math.random() * 140;
-    // Purple-energy spark burst from her current center (uses position
-    // BEFORE the flinch teleport so sparks erupt where the hit landed).
+    // v12: removed the random flinch teleport. It was creating a "ghost image"
+    // artifact — the boss would flash at a random new location for ONE frame,
+    // then the figure-8 update would snap her back to her path. Visually
+    // jarring (looked like a double-sprite). Now she just plays the hit
+    // sprite + sparks at her current location and stays on the figure-8 path.
     spawnBigGHitSparks(state.bigG.x + BIGG_W / 2, state.bigG.y + BIGG_H / 2);
-    state.bigG.x = newX;
-    state.bigG.y = newY;
-    state.bigG.vx = (Math.random() - 0.5) * 1.5;
-    state.bigG.vy = 0;
     playBossHit();
     // Phase shifts.
     const hpPct = state.bigG.hp / state.bigG.maxHp;
@@ -4014,6 +4020,36 @@
       grad.addColorStop(1, `rgba(120, 50, 180, ${v})`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
+    }
+    // ---- "BIG G HAS ARRIVED!" intro banner (v12) ----
+    // Drawn during the intro state, anchored center-canvas. Pixel font, purple
+    // stroke + glow, gentle scale-bounce that mirrors the sprite overshoot.
+    if (bg.state === 'intro') {
+      const ticksIn = BIGG_INTRO_TICKS - Math.max(0, bg.introUntilTick - state.activeTicks);
+      const tBan = Math.max(0, Math.min(1, ticksIn / BIGG_INTRO_TICKS));
+      // Fade in over first 25%, hold to 80%, fade out last 20%.
+      let bannerAlpha = 0;
+      if      (tBan < 0.25) bannerAlpha = tBan / 0.25;
+      else if (tBan < 0.80) bannerAlpha = 1;
+      else                  bannerAlpha = Math.max(0, 1 - (tBan - 0.80) / 0.20);
+      if (bannerAlpha > 0) {
+        const scale = 1 + 0.06 * Math.sin(performance.now() / 130);
+        ctx.save();
+        ctx.globalAlpha = bannerAlpha;
+        ctx.translate(W/2, H * 0.62);
+        ctx.scale(scale, scale);
+        ctx.font = 'bold 38px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = 'rgba(20, 5, 40, 0.95)';
+        ctx.strokeText('BIG G HAS ARRIVED!', 0, 0);
+        ctx.shadowColor = '#d080ff';
+        ctx.shadowBlur = 26;
+        ctx.fillStyle = '#e8b8ff';
+        ctx.fillText('BIG G HAS ARRIVED!', 0, 0);
+        ctx.restore();
+      }
     }
   }
 
@@ -4964,6 +5000,16 @@
       state.pendingBossSpawn = false;
       spawnBigG(false);
     }
+    // v12: freeze ball physics during the boss intro cinematic so the player
+    // can't lose a life while she's making her grand entrance. We still tick
+    // boss state + reactions + orbs, but skip the rest of physics including
+    // ball motion + brick collisions. The ball just sits where it was.
+    if (state.bigG.active && state.bigG.state === 'intro') {
+      updateAkhilReaction();
+      updateBigG();
+      updateOrbs();
+      return;
+    }
     // Boss + reactions + orbs (their own internal timers — must run before the
     // physics block so collision uses fresh boss position).
     updateAkhilReaction();
@@ -5134,7 +5180,11 @@
     if (state.akhil.active) {
       state.akhil.rotation += 0.025;          // visual spin
       const R = ballRadius();
-      const AKHIL_SPEED = 9.3;
+      // v12: dropped from 9.3 → 7.6. Constant homing in v11.1 made the ball
+      // FEEL faster than older versions even at the same speed (no bounces
+      // between brick hits — full-speed travel the whole time). 7.6 lands
+      // in the same perceived range as the pre-v11 9.3-with-bouncing.
+      const AKHIL_SPEED = 7.6;
       const AKHIL_DRIFT_TICKS = 10;            // brief no-homing window after a bounce
       // Akhil-meets-mom reaction: freeze the ball.
       if (state.akhilReaction.active) {
@@ -5203,14 +5253,47 @@
       // Move.
       state.ball.x += state.ball.vx;
       state.ball.y += state.ball.vy;
-      // Steel collision — min-overlap nudge + re-pick target avoiding this steel.
+      // ---- Collision priority (v12) ----
+      // Damageable bricks come FIRST — fixes the bug where the ball was wedged
+      // between a steel and a tough brick: the old order resolved steel first,
+      // which sometimes pushed the ball INTO the adjacent tough, then the
+      // non-steel loop damaged it, then next tick steel sound played again.
+      // By damaging non-steel first, the tough brick dies in ~2 ticks instead
+      // of looping with steel-clang SFX.
+      let damagedThisTick = false;
       for (const b of state.bricks) {
-        if (!b.alive || b.kind !== 'steel') continue;
+        if (!b.alive || b.kind === 'steel') continue;
         if (resolveBoxOverlap(state.ball, R, b)) {
-          playSteelClang();
-          state.akhil.target = pickAkhilTarget(b);
+          const destroyed = damageBrick(b);
+          playAkhilLaugh();
+          if (destroyed && state.akhil.target === b) state.akhil.target = null;
           state.akhil.bounceTicks = AKHIL_DRIFT_TICKS;
+          damagedThisTick = true;
+          if (destroyed && !state.bigG.active &&
+              state.bricks.every(bb => !bb.alive || bb.kind === 'steel')) {
+            triggerLevelClear();
+          }
           break;
+        }
+      }
+      // Steel collision — only if we didn't already damage a brick this tick.
+      // Skipping when damagedThisTick eliminates the steel↔tough oscillation.
+      // After each steel hit we also rotate the velocity by ±20° so the ball
+      // doesn't reflect into a symmetric back-and-forth with the same steel.
+      if (!damagedThisTick) {
+        for (const b of state.bricks) {
+          if (!b.alive || b.kind !== 'steel') continue;
+          if (resolveBoxOverlap(state.ball, R, b)) {
+            playSteelClang();
+            const ang = Math.atan2(state.ball.vy, state.ball.vx);
+            const nudge = (Math.random() - 0.5) * Math.PI * 0.22;   // ±20°
+            const speed = Math.hypot(state.ball.vx, state.ball.vy) || AKHIL_SPEED;
+            state.ball.vx = Math.cos(ang + nudge) * speed;
+            state.ball.vy = Math.sin(ang + nudge) * speed;
+            state.akhil.target = pickAkhilTarget(b);
+            state.akhil.bounceTicks = AKHIL_DRIFT_TICKS;
+            break;
+          }
         }
       }
       // Boss collision — same resolver + apply damage.
@@ -5220,22 +5303,6 @@
           applyBossHit(hb);
           state.akhil.target = pickAkhilTarget(null);
           state.akhil.bounceTicks = AKHIL_DRIFT_TICKS;
-        }
-      }
-      // Target brick collision (any live non-steel brick we ran into — could
-      // be the picked target or a stray we happened to clip).
-      for (const b of state.bricks) {
-        if (!b.alive || b.kind === 'steel') continue;
-        if (resolveBoxOverlap(state.ball, R, b)) {
-          const destroyed = damageBrick(b);
-          playAkhilLaugh();
-          if (destroyed && state.akhil.target === b) state.akhil.target = null;
-          state.akhil.bounceTicks = AKHIL_DRIFT_TICKS;
-          if (destroyed && !state.bigG.active &&
-              state.bricks.every(bb => !bb.alive || bb.kind === 'steel')) {
-            triggerLevelClear();
-          }
-          break;
         }
       }
       // Wall clamps. Akhil ball never reaches paddle.
@@ -5550,9 +5617,34 @@
     if (applyScale) ctx.restore();
   }
   function drawToughBrick(b) {
-    // Darker hue of the brick's row color — so it reads "tough" by tint alone.
-    const top = shade(b.color, -35);
-    const bot = shade(b.color, -65);
+    // Revived tough bricks: same purple cursed palette as revived normal
+    // bricks (v12 fix — was showing the original color tint, breaking
+    // consistency). Solidify-bounce scale, glow border + sparkles applied
+    // below via the shared _revived overlay.
+    let top, bot;
+    if (b._revived) {
+      top = '#8030b0';
+      bot = '#3e0a80';
+    } else {
+      top = shade(b.color, -35);
+      bot = shade(b.color, -65);
+    }
+    // ---- Solidify bounce (revived bricks, first 10 frames after revival) ----
+    let applyScale = false;
+    if (b._revived && b._revivedAtTick !== undefined) {
+      const since = state.activeTicks - b._revivedAtTick;
+      if (since < 10) {
+        const t = since / 10;
+        const ease = 1 - Math.pow(1 - t, 3);
+        let s = 0.6 + 0.4 * ease;
+        if (t > 0.75) s = 1 + 0.08 * Math.sin((t - 0.75) / 0.25 * Math.PI);
+        ctx.save();
+        ctx.translate(b.x + b.w/2, b.y + b.h/2);
+        ctx.scale(s, s);
+        ctx.translate(-(b.x + b.w/2), -(b.y + b.h/2));
+        applyScale = true;
+      }
+    }
     const grad = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
     grad.addColorStop(0, top);
     grad.addColorStop(1, bot);
@@ -5624,6 +5716,32 @@
       ctx.stroke();
       ctx.restore();
     }
+    // ---- Revived (cursed) overlay for tough bricks (v12) ----
+    if (b._revived) {
+      const tNow = performance.now();
+      const pulse = 0.7 + 0.3 * Math.sin(tNow / 280);
+      ctx.save();
+      ctx.strokeStyle = `rgba(220, 140, 255, ${pulse})`;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#d080ff';
+      ctx.shadowBlur = 12;
+      ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+      ctx.restore();
+      // Drifting interior sparkles
+      for (let i = 0; i < 2; i++) {
+        const ph = (tNow / 380 + i * 0.5) % 1;
+        const sx = b.x + 4 + ph * (b.w - 8);
+        const sy = b.y + 4 + ((tNow / 220 + i * 0.7) % 1) * (b.h - 8);
+        const sa = (0.5 + 0.5 * Math.sin(tNow / 90 + i * 1.7));
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 255, 255, ${sa})`;
+        ctx.shadowColor = '#d080ff';
+        ctx.shadowBlur = 6;
+        ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+        ctx.restore();
+      }
+    }
+    if (applyScale) ctx.restore();
   }
   function drawSteelBrick(b) {
     // Brushed-metal gray with horizontal grain + rivets and a strong border.
@@ -6224,9 +6342,10 @@
     const bossActive = state.bigG.active && state.bigG.state !== 'dying';
     // Mode HUD position: when boss is active, shift below her HP bar; otherwise
     // sits in the top band where the HP bar would be. Pill background is now
-    // ALWAYS shown (was only on bossActive) so the HUD looks identical with or
-    // without the boss.
-    const yBase = bossActive ? 60 : 36;
+    // ALWAYS shown so the HUD looks identical with or without the boss.
+    // v12: moved up from 36 → 22 (no-boss case) so the pill's bottom edge no
+    // longer kisses the top brick row at y=50.
+    const yBase = bossActive ? 60 : 22;
     const y = yBase + grow * 4;
     const text = label + '  ' + remaining.toFixed(1) + 'S';
     ctx.save();
