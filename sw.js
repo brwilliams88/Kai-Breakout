@@ -1,7 +1,7 @@
 // ---------- Kai Breakout — Service Worker (offline cache) ----------
 // Pre-caches the game's assets so it loads instantly with no network. Bump the
 // CACHE_VERSION whenever you ship a new build so old clients fetch the new files.
-const CACHE_VERSION = 'kai-breakout-v12';
+const CACHE_VERSION = 'kai-breakout-v12.1';
 const ASSETS = [
   './',
   './index.html',
